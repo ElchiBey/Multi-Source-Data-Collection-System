@@ -46,4 +46,4 @@ w3lib==2.1.2
 
 # Optional Advanced Features
 undetected-chromedriver==3.5.4
-anticaptchaofficial==1.0.46
+anticaptchaofficial==1.0.46 
