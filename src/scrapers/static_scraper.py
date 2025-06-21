@@ -10,15 +10,19 @@ from bs4 import BeautifulSoup, Tag
 import requests
 from urllib.parse import urljoin
 import re
+import random
 
 from .base_scraper import BaseScraper
-from src.utils.helpers import extract_price, extract_rating, clean_text, normalize_url
+from src.utils.helpers import (
+    extract_price, extract_rating, clean_text, normalize_url,
+    get_random_headers, random_delay, get_proxy_list, should_use_proxy
+)
 
 class StaticScraper(BaseScraper):
     """
     Static scraper using BeautifulSoup4 for HTML parsing.
     
-    Implements Strategy Pattern for static content scraping.
+    Implements Strategy Pattern for static content scraping with anti-bot protection.
     """
     
     def __init__(self, source: str, config: Dict[str, Any]):
@@ -31,6 +35,9 @@ class StaticScraper(BaseScraper):
         """
         super().__init__(source, config)
         
+        # Initialize session for connection reuse
+        self.session = requests.Session()
+        
         # Load scraper-specific selectors
         try:
             from src.utils.config import load_config
@@ -39,6 +46,115 @@ class StaticScraper(BaseScraper):
         except Exception as e:
             self.logger.warning(f"Failed to load selectors for {source}: {e}")
             self.selectors = {}
+    
+    def _make_request(self, url: str, retries: int = 3) -> requests.Response:
+        """
+        Make HTTP request with anti-bot protection.
+        
+        Args:
+            url: URL to request
+            retries: Number of retry attempts
+            
+        Returns:
+            Response object
+            
+        Raises:
+            requests.RequestException: If request fails after retries
+        """
+        for attempt in range(retries):
+            try:
+                # Add random delay between requests
+                if attempt > 0:
+                    random_delay(2.0, 5.0)  # Longer delay on retries
+                else:
+                    random_delay(1.0, 3.0)  # Normal delay
+                
+                # Get random headers
+                headers = get_random_headers()
+                
+                # Add referer header for subsequent requests
+                if hasattr(self, '_last_url'):
+                    headers['Referer'] = self._last_url
+                
+                # Configure proxy if needed
+                proxies = {}
+                if should_use_proxy():
+                    proxy_list = get_proxy_list()
+                    if proxy_list:
+                        proxy = random.choice(proxy_list)
+                        proxies = {'http': proxy, 'https': proxy}
+                        self.logger.debug(f"Using proxy: {proxy}")
+                
+                # Make request
+                response = self.session.get(
+                    url,
+                    headers=headers,
+                    proxies=proxies,
+                    timeout=30,
+                    allow_redirects=True
+                )
+                
+                # Check for common anti-bot responses
+                if self._is_blocked_response(response):
+                    self.logger.warning(f"Blocked response detected on attempt {attempt + 1}")
+                    if attempt < retries - 1:
+                        continue
+                    else:
+                        raise requests.RequestException("Blocked by anti-bot protection")
+                
+                response.raise_for_status()
+                self._last_url = url
+                
+                self.logger.debug(f"Successfully requested {url} (attempt {attempt + 1})")
+                return response
+                
+            except requests.RequestException as e:
+                self.logger.warning(f"Request failed on attempt {attempt + 1}: {e}")
+                if attempt == retries - 1:
+                    raise
+                
+        raise requests.RequestException(f"Failed to request {url} after {retries} attempts")
+    
+    def _is_blocked_response(self, response: requests.Response) -> bool:
+        """
+        Check if response indicates we're blocked by anti-bot protection.
+        
+        Args:
+            response: HTTP response to check
+            
+        Returns:
+            True if response indicates blocking
+        """
+        # Check status codes
+        if response.status_code in [403, 429, 503]:
+            return True
+        
+        # Check for common blocking indicators in content
+        if response.text:
+            blocking_indicators = [
+                'access denied',
+                'blocked',
+                'captcha',
+                'cloudflare',
+                'please verify you are human',
+                'unusual traffic',
+                'automated queries',
+                'robot',
+                'bot detected',
+            ]
+            
+            content_lower = response.text.lower()
+            for indicator in blocking_indicators:
+                if indicator in content_lower:
+                    self.logger.warning(f"Blocking indicator found: {indicator}")
+                    return True
+        
+        # Check response size (very small responses might be blocks)
+        if len(response.text) < 500:
+            self.logger.warning("Suspiciously small response size")
+            return True
+            
+        return False
     
     def _scrape_page(self, keyword: str, page: int) -> List[Dict[str, Any]]:
         """

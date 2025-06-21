@@ -11,6 +11,8 @@ import urllib.parse
 from datetime import datetime, timedelta
 import hashlib
 import html
+import random
+import time
 
 def create_directories() -> None:
     """Create necessary directories for the application."""
@@ -49,107 +51,72 @@ def clean_text(text: str) -> str:
     text = text.strip()
     
     # Remove non-printable characters
-    text = re.sub(r'[\x00-\x1f\x7f-\x9f]', '', text)
+    text = re.sub(r'[^\x20-\x7E]', '', text)
     
     return text
 
-def extract_price(text: str, currency: str = 'USD') -> Optional[float]:
-    """
-    Extract price value from text string.
-    
-    Args:
-        text: Text containing price information
-        currency: Expected currency (default: USD)
-        
-    Returns:
-        Extracted price as float or None if not found
-    """
-    if not text:
+def extract_price(price_text: str) -> Optional[float]:
+    """Extract price from text string."""
+    if not price_text:
         return None
     
-    # Common price patterns
-    patterns = [
-        r'\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',  # $1,234.56 or 1234.56
-        r'USD\s*(\d+(?:,\d{3})*(?:\.\d{2})?)',  # USD 1234.56
-        r'(\d+(?:,\d{3})*(?:\.\d{2})?)\s*USD',  # 1234.56 USD
-        r'Price:\s*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)',  # Price: $1234.56
-    ]
+    # Remove currency symbols and non-numeric characters except decimal point
+    price_clean = re.sub(r'[^\d.,]', '', price_text)
     
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            price_str = match.group(1).replace(',', '')
-            try:
-                return float(price_str)
-            except ValueError:
-                continue
+    # Handle different decimal separators
+    if ',' in price_clean and '.' in price_clean:
+        # Assume comma is thousands separator if both present
+        price_clean = price_clean.replace(',', '')
+    elif ',' in price_clean:
+        # Could be decimal separator in some locales
+        if price_clean.count(',') == 1 and len(price_clean.split(',')[1]) <= 2:
+            price_clean = price_clean.replace(',', '.')
+    
+    try:
+        return float(price_clean)
+    except ValueError:
+        return None
+
+def extract_rating(rating_text: str) -> Optional[float]:
+    """Extract rating from text string."""
+    if not rating_text:
+        return None
+    
+    # Look for pattern like "4.5 out of 5" or just "4.5"
+    rating_match = re.search(r'(\d+\.?\d*)', rating_text)
+    if rating_match:
+        try:
+            rating = float(rating_match.group(1))
+            # Normalize to 5-star scale if needed
+            if rating > 5:
+                rating = rating / 2  # Convert 10-star to 5-star
+            return min(rating, 5.0)
+        except ValueError:
+            pass
     
     return None
 
-def extract_rating(text: str) -> Optional[float]:
-    """
-    Extract rating value from text.
-    
-    Args:
-        text: Text containing rating information
-        
-    Returns:
-        Rating as float (0-5 scale) or None if not found
-    """
-    if not text:
-        return None
-    
-    # Rating patterns
-    patterns = [
-        r'(\d+(?:\.\d+)?)\s*out\s*of\s*5',  # 4.5 out of 5
-        r'(\d+(?:\.\d+)?)\s*\/\s*5',  # 4.5/5
-        r'(\d+(?:\.\d+)?)\s*stars?',  # 4.5 stars
-        r'Rating:\s*(\d+(?:\.\d+)?)',  # Rating: 4.5
-    ]
-    
-    for pattern in patterns:
-        match = re.search(pattern, text, re.IGNORECASE)
-        if match:
-            try:
-                rating = float(match.group(1))
-                # Normalize to 0-5 scale
-                if rating <= 5:
-                    return rating
-                elif rating <= 10:
-                    return rating / 2
-                elif rating <= 100:
-                    return rating / 20
-            except ValueError:
-                continue
-    
-    return None
-
-def normalize_url(url: str, base_url: str = '') -> str:
-    """
-    Normalize URL by making it absolute and cleaning it.
-    
-    Args:
-        url: URL to normalize
-        base_url: Base URL for relative URLs
-        
-    Returns:
-        Normalized absolute URL
-    """
+def normalize_url(url: str, base_url: str = "") -> str:
+    """Normalize URL by making it absolute and cleaning it."""
     if not url:
-        return ''
+        return ""
     
-    # Remove leading/trailing whitespace
-    url = url.strip()
-    
-    # Handle relative URLs
+    # Make absolute URL
     if url.startswith('//'):
         url = 'https:' + url
-    elif url.startswith('/') and base_url:
+    elif url.startswith('/'):
         url = urllib.parse.urljoin(base_url, url)
-    elif not url.startswith(('http://', 'https://')) and base_url:
+    elif not url.startswith(('http://', 'https://')):
         url = urllib.parse.urljoin(base_url, url)
     
     return url
+
+def generate_data_hash(data: dict) -> str:
+    """Generate MD5 hash for data deduplication."""
+    # Create a string representation of key data fields
+    key_fields = ['title', 'url', 'price', 'source']
+    hash_string = ''.join(str(data.get(field, '')) for field in key_fields)
+    return hashlib.md5(hash_string.encode()).hexdigest()
 
 def generate_hash(data: str) -> str:
     """
@@ -371,3 +338,119 @@ def merge_dicts(dict1: Dict[str, Any], dict2: Dict[str, Any]) -> Dict[str, Any]:
             result[key] = value
     
     return result 
+
+# Anti-bot protection utilities
+def get_random_user_agent() -> str:
+    """Get a random user agent string."""
+    user_agents = [
+        # Chrome on Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+        
+        # Chrome on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        
+        # Firefox on Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0",
+        
+        # Firefox on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:120.0) Gecko/20100101 Firefox/120.0",
+        
+        # Safari on macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15",
+        
+        # Edge on Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    ]
+    return random.choice(user_agents)
+
+def get_random_headers() -> dict:
+    """Get random HTTP headers to mimic real browser requests."""
+    headers = {
+        'User-Agent': get_random_user_agent(),
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': random.choice([
+            'en-US,en;q=0.9',
+            'en-GB,en;q=0.9',
+            'en-US,en;q=0.5',
+        ]),
+        'Accept-Encoding': 'gzip, deflate, br',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+        'Cache-Control': 'max-age=0',
+    }
+    
+    # Sometimes add additional headers
+    if random.random() > 0.5:
+        headers['Sec-CH-UA'] = '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"'
+        headers['Sec-CH-UA-Mobile'] = '?0'
+        headers['Sec-CH-UA-Platform'] = random.choice(['"Windows"', '"macOS"', '"Linux"'])
+    
+    return headers
+
+def random_delay(min_seconds: float = 1.0, max_seconds: float = 3.0) -> None:
+    """Add random delay between requests."""
+    delay = random.uniform(min_seconds, max_seconds)
+    time.sleep(delay)
+
+def get_proxy_list() -> List[str]:
+    """Get list of proxy servers (you would populate this with real proxies)."""
+    # This is a placeholder - you would add real proxy servers here
+    # Free proxies are often unreliable, consider paid proxy services
+    return [
+        # 'http://proxy1:port',
+        # 'http://proxy2:port',
+        # 'https://proxy3:port',
+    ]
+
+def should_use_proxy() -> bool:
+    """Decide whether to use proxy for this request."""
+    # Use proxy 30% of the time (adjust as needed)
+    return random.random() < 0.3
+
+def get_selenium_options():
+    """Get Selenium Chrome options for anti-bot protection."""
+    from selenium.webdriver.chrome.options import Options
+    
+    options = Options()
+    
+    # Basic stealth options
+    options.add_argument('--no-sandbox')
+    options.add_argument('--disable-dev-shm-usage')
+    options.add_argument('--disable-gpu')
+    options.add_argument('--disable-features=VizDisplayCompositor')
+    
+    # Anti-detection options
+    options.add_argument('--disable-blink-features=AutomationControlled')
+    options.add_experimental_option("excludeSwitches", ["enable-automation"])
+    options.add_experimental_option('useAutomationExtension', False)
+    
+    # Random window size
+    window_sizes = [
+        '--window-size=1366,768',
+        '--window-size=1920,1080', 
+        '--window-size=1440,900',
+        '--window-size=1536,864',
+    ]
+    options.add_argument(random.choice(window_sizes))
+    
+    # Random user agent
+    options.add_argument(f'--user-agent={get_random_user_agent()}')
+    
+    # Disable images and CSS for faster loading (optional)
+    # prefs = {
+    #     "profile.managed_default_content_settings.images": 2,
+    #     "profile.default_content_setting_values.notifications": 2,
+    # }
+    # options.add_experimental_option("prefs", prefs)
+    
+    return options 

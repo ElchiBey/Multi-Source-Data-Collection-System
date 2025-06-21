@@ -15,9 +15,28 @@ Design Patterns Implemented:
 
 from .base_scraper import BaseScraper, ScrapingResult
 from .static_scraper import StaticScraper
-from .selenium_scraper import SeleniumScraper
-from .manager import ScrapingManager
-from .factory import ScraperFactory
+
+# Import optional components with fallbacks
+try:
+    from .selenium_scraper import SeleniumScraper
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SeleniumScraper = None
+    SELENIUM_AVAILABLE = False
+
+try:
+    from .manager import ScrapingManager
+    MANAGER_AVAILABLE = True
+except ImportError:
+    ScrapingManager = None
+    MANAGER_AVAILABLE = False
+
+try:
+    from .factory import ScraperFactory
+    FACTORY_AVAILABLE = True
+except ImportError:
+    ScraperFactory = None
+    FACTORY_AVAILABLE = False
 
 # Import Scrapy components (optional, in case Scrapy isn't installed)
 try:
@@ -38,5 +57,8 @@ __all__ = [
     'ScraperFactory',
     'ProductSpider',
     'ScrapyRunner',
+    'SELENIUM_AVAILABLE',
+    'MANAGER_AVAILABLE',
+    'FACTORY_AVAILABLE',
     'SCRAPY_AVAILABLE'
 ] 
