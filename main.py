@@ -12,7 +12,6 @@ import click
 import logging
 from pathlib import Path
 
-from src.cli.interface import cli
 from src.utils.logger import setup_logger
 from src.utils.config import load_config
 
