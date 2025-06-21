@@ -1,0 +1,118 @@
+# Scraper-specific Configuration
+
+amazon:
+  selectors:
+    # Product listing selectors
+    product_container: '[data-component-type="s-search-result"]'
+    title: 'h2 a span, .s-title-instructions-style span'
+    price: '.a-price-whole, .a-price .a-offscreen'
+    rating: '.a-icon-alt'
+    image: '.s-image'
+    link: 'h2 a'
+    
+  # Dynamic selectors for individual product pages
+  product_page:
+    title: '#productTitle'
+    price: '.a-price .a-offscreen, .a-price-whole'
+    description: '#feature-bullets ul'
+    specs: '#prodDetails table'
+    availability: '#availability span'
+    
+  # Request headers
+  headers:
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    'Accept-Language': 'en-US,en;q=0.5'
+    'Accept-Encoding': 'gzip, deflate'
+    'Connection': 'keep-alive'
+    
+  # URL patterns
+  patterns:
+    search: '/s?k={keyword}&page={page}'
+    product: '/dp/{asin}'
+
+ebay:
+  selectors:
+    # Listing selectors
+    product_container: '.s-item'
+    title: '.s-item__title'
+    price: '.s-item__price'
+    shipping: '.s-item__shipping'
+    condition: '.s-item__subtitle'
+    image: '.s-item__image img'
+    link: '.s-item__link'
+    
+  # Individual listing selectors
+  product_page:
+    title: '#x-title-label-lbl'
+    price: '.notranslate'
+    seller: '.seller-persona'
+    shipping: '.vi-price .notranslate'
+    condition: '.u-flL.condText'
+    
+  headers:
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    'Accept': 'text/html,application/xhtml+xml'
+    
+  patterns:
+    search: '/sch/i.html?_nkw={keyword}&_pgn={page}'
+    item: '/itm/{item_id}'
+
+walmart:
+  selectors:
+    # Product grid selectors
+    product_container: '[data-automation-id="product-tile"]'
+    title: '[data-automation-id="product-title"]'
+    price: '[data-automation-id="product-price"] span'
+    rating: '.average-rating'
+    image: 'img[data-automation-id="product-image"]'
+    link: 'a'
+    
+  # Product page selectors
+  product_page:
+    title: '[data-automation-id="product-title"] h1'
+    price: '[data-automation-id="product-price-value"]'
+    description: '[data-automation-id="product-highlights"]'
+    specs: '.specs-table'
+    
+  headers:
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+    'Accept': 'text/html,application/xhtml+xml'
+    
+  patterns:
+    search: '/search/?query={keyword}&page={page}'
+    product: '/ip/{slug}/{wmt_id}'
+
+# Common selectors for dynamic content
+dynamic_selectors:
+  # Common loading indicators
+  loading:
+    - '.loading'
+    - '.spinner'
+    - '[data-loading="true"]'
+    
+  # Common "no results" indicators
+  no_results:
+    - '.no-results'
+    - '.empty-state'
+    - '[data-empty="true"]'
+    
+  # Common pagination
+  pagination:
+    - '.pagination'
+    - '.page-numbers'
+    - '[data-pagination]'
+
+# Anti-bot detection patterns
+anti_bot_patterns:
+  captcha:
+    - 'captcha'
+    - 'robot'
+    - 'verification'
+    - 'security check'
+    
+  blocked:
+    - 'access denied'
+    - 'forbidden'
+    - 'rate limit'
+    - 'too many requests' 
