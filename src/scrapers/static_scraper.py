@@ -40,8 +40,9 @@ class StaticScraper(BaseScraper):
         
         # Load scraper-specific selectors
         try:
-            from src.utils.config import load_config
-            scraper_config = load_config('config/scrapers.yaml')
+            import yaml
+            with open('config/scrapers.yaml', 'r') as f:
+                scraper_config = yaml.safe_load(f)
             self.selectors = scraper_config.get(source, {}).get('selectors', {})
         except Exception as e:
             self.logger.warning(f"Failed to load selectors for {source}: {e}")

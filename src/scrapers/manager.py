@@ -91,12 +91,12 @@ class ScrapingManager:
                     for keyword in keywords:
                         logger.info(f"Searching {source} for '{keyword}'...")
                         
-                        # Scrape products for this keyword
-                        products = scraper.scrape_products(
-                            source=source,
-                            keyword=keyword,
+                        # Scrape products for this keyword  
+                        result = scraper.scrape(
+                            keywords=[keyword],
                             max_pages=max_pages
                         )
+                        products = result.data if result.success else []
                         
                         if products:
                             source_results.extend(products)
@@ -246,11 +246,11 @@ class ScrapingManager:
             scraper = scraper_class(source, self.config)
             
             # Test with just 1 page
-            products = scraper.scrape_products(
-                source=source,
-                keyword=keyword,
+            result = scraper.scrape(
+                keywords=[keyword],
                 max_pages=1
             )
+            products = result.data if result.success else []
             
             return {
                 'success': True,

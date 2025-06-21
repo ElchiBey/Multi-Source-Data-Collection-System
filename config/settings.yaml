@@ -3,10 +3,10 @@
 # Scraping Configuration
 scraping:
   # Delay between requests (seconds)
-  delay_range: [1, 3]
+  delay_range: [3, 8]
   
   # Maximum retry attempts
-  max_retries: 3
+  max_retries: 5
   
   # Request timeout (seconds)
   timeout: 30
@@ -139,8 +139,9 @@ security:
   requests_per_minute: 30
   
   # Proxy settings
-  use_proxies: false
-  proxy_list: []
+  use_proxies: true
+  proxy_list: ["http://127.0.0.1:9090", "http://proxy1:port", "http://proxy2:port"]
   
   # User agent rotation
   rotate_user_agents: true 
+
