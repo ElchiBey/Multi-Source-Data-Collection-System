@@ -64,8 +64,8 @@ class DatabaseManager(LoggerMixin):
             # Create session factory
             self._session_factory = sessionmaker(bind=self._engine)
             
-            # Create tables
-            Base.metadata.create_all(self._engine)
+            # Create tables (checkfirst=True prevents duplicate creation errors)
+            Base.metadata.create_all(self._engine, checkfirst=True)
             
             self.logger.info(f"Database initialized successfully: {db_url}")
             
