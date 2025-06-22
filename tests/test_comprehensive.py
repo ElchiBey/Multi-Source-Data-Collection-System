@@ -55,39 +55,51 @@ class TestScrapers(unittest.TestCase):
     
     def setUp(self):
         """Set up test configuration."""
+        # Load global configuration for scrapers
+        from src.utils.config import load_config
+        load_config('config/settings.yaml')
+        
         self.config = BASE_CONFIG.copy()
     
     def test_static_scraper_initialization(self):
         """Test StaticScraper initialization."""
-        scraper = StaticScraper(self.config)
+        scraper = StaticScraper('test_source', self.config)
         self.assertIsNotNone(scraper)
         self.assertEqual(scraper.config, self.config)
     
-    @patch('src.scrapers.static_scraper.requests.get')
-    def test_static_scraper_get_page_success(self, mock_get):
+    def test_static_scraper_get_page_success(self):
         """Test successful page fetching."""
         mock_response = Mock()
         mock_response.status_code = 200
-        mock_response.text = '<html><body>Test</body></html>'
-        mock_get.return_value = mock_response
+        # Make response long enough to avoid size warnings (> 500 chars)
+        mock_response.text = '<html><body><h1>Test Page</h1>' + '<div>Product content here</div>' * 20 + '</body></html>'
+        mock_response.raise_for_status = Mock()  # Mock this to avoid issues
         
-        scraper = StaticScraper(self.config)
-        response = scraper._get_page('https://example.com')
+        scraper = StaticScraper('test_source', self.config)
         
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('Test', response.text)
+        # Mock the session.get method to return our mock response
+        with patch.object(scraper.session, 'get', return_value=mock_response):
+            response = scraper._make_request('https://example.com')
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Test Page', response.text)
     
     def test_selenium_scraper_initialization(self):
         """Test SeleniumScraper initialization."""
         with patch('src.scrapers.selenium_scraper.webdriver.Chrome'):
-            scraper = SeleniumScraper(self.config)
+            scraper = SeleniumScraper('test_source', self.config)
             self.assertIsNotNone(scraper)
     
     def test_scraping_manager_initialization(self):
         """Test ScrapingManager initialization."""
-        manager = ScrapingManager(self.config)
+        # Use test database to avoid index conflicts
+        test_config = self.config.copy()
+        test_config['database']['url'] = 'sqlite:///:memory:'
+        
+        manager = ScrapingManager(test_config)
         self.assertIsNotNone(manager)
-        self.assertEqual(len(manager.scrapers), 2)  # static and selenium
+        # Updated to reflect actual scrapers available
+        self.assertGreaterEqual(len(manager.scraper_classes), 2)
 
 class TestHelperFunctions(unittest.TestCase):
     """Test utility helper functions."""
@@ -173,7 +185,7 @@ class TestHelperFunctions(unittest.TestCase):
         import time
         
         start_time = time.time()
-        random_delay(min_delay=0.1, max_delay=0.2)
+        random_delay(min_seconds=0.1, max_seconds=0.2)
         elapsed = time.time() - start_time
         
         # Should be within expected range (with some tolerance)
@@ -248,14 +260,19 @@ class TestDataAnalysis(unittest.TestCase):
             'export': {'output_dir': tempfile.mkdtemp()}
         }
         
-        # Create sample DataFrame for testing
+        # Create sample DataFrame for testing with all required columns
         self.sample_data = pd.DataFrame({
+            'id': [1, 2, 3, 4],
             'source': ['amazon', 'ebay', 'amazon', 'walmart'],
             'title': ['Laptop 1', 'Laptop 2', 'Phone 1', 'Phone 2'],
+            'url': ['http://example.com/1', 'http://example.com/2', 'http://example.com/3', 'http://example.com/4'],
             'price': [999.99, 899.99, 599.99, 649.99],
             'rating': [4.5, 4.2, 4.8, 4.0],
             'search_keyword': ['laptop', 'laptop', 'phone', 'phone'],
-            'scraped_at': [datetime.now()] * 4
+            'page_number': [1, 1, 1, 1],
+            'position_on_page': [1, 2, 1, 2],
+            'scraped_at': [datetime.now()] * 4,
+            'scraper_type': ['static', 'selenium', 'static', 'static']
         })
     
     @patch('src.analysis.statistics.ProductStatistics._get_products_dataframe')

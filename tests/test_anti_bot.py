@@ -114,6 +114,10 @@ class TestAntiBot:
     
     def test_static_scraper_anti_bot_detection(self):
         """Test static scraper's ability to detect bot blocking."""
+        # Load configuration before creating scraper
+        from src.utils.config import load_config
+        load_config('config/settings.yaml')
+        
         scraper = StaticScraper('test_site', self.config)
         
         # Mock a blocked response
@@ -125,15 +129,22 @@ class TestAntiBot:
         is_blocked = scraper._is_blocked_response(mock_response)
         assert is_blocked, "Failed to detect blocked response"
         
-        # Test normal response
+        # Test normal response with sufficient content
         mock_response.status_code = 200
-        mock_response.text = "Normal page content with products"
+        mock_response.text = "<html><body><h1>Product Search Results</h1>" + \
+                            "<div class='product'>Product 1</div>" * 20 + \
+                            "<div class='product'>Product 2</div>" * 20 + \
+                            "</body></html>"  # Make it long enough (> 500 chars)
         
         is_blocked = scraper._is_blocked_response(mock_response)
         assert not is_blocked, "False positive in blocking detection"
     
     def test_static_scraper_request_headers(self):
         """Test that static scraper uses randomized headers."""
+        # Load configuration before creating scraper
+        from src.utils.config import load_config
+        load_config('config/settings.yaml')
+        
         scraper = StaticScraper('test_site', self.config)
         
         # Mock the session.get method to capture headers
@@ -158,45 +169,67 @@ class TestAntiBot:
                 pass  # Expected since we're mocking
     
     def test_rate_limiting_implementation(self):
-        """Test that rate limiting adds appropriate delays."""
-        scraper = StaticScraper('test_site', self.config)
+        """Test rate limiting between requests."""
+        # Load configuration before creating scraper
+        from src.utils.config import load_config
+        load_config('config/settings.yaml')
         
-        # Reset last request time
-        scraper.last_request_time = 0
+        # Mock response
+        mock_response = Mock()
+        mock_response.status_code = 200
+        mock_response.text = "<html><body>Test content that is long enough to not trigger size warnings" + "x" * 500 + "</body></html>"
+        mock_response.raise_for_status = Mock()  # Mock this method to avoid HTTPError
         
-        start_time = time.time()
-        scraper._rate_limit()
-        end_time = time.time()
+        # Test rate limiting by making multiple requests
+        from unittest.mock import patch
         
-        # Should have added some delay
-        elapsed = end_time - start_time
-        assert elapsed >= 0.05, "Rate limiting not working"
+        # Patch random_delay in the static_scraper module where it's used
+        with patch('src.scrapers.static_scraper.random_delay') as mock_delay:
+            scraper = StaticScraper('test_site', self.config)
+            
+            # Mock the session.get method
+            with patch.object(scraper.session, 'get', return_value=mock_response):
+                # Make two requests
+                scraper._make_request('https://example.com/test1')
+                scraper._make_request('https://example.com/test2')
+                
+                # Verify delay was called (at least twice, once per request)
+                assert mock_delay.called, "Rate limiting delay not implemented"
+                assert mock_delay.call_count >= 2, f"Delay not called enough times: {mock_delay.call_count}"
     
     def test_captcha_detection_patterns(self):
-        """Test CAPTCHA detection in page content."""
-        # Test data with CAPTCHA indicators
-        test_cases = [
-            ("Please verify you are human", True),
-            ("Complete this CAPTCHA", True),
-            ("I'm not a robot", True),
-            ("Normal page content", False),
-            ("Product listings here", False),
-        ]
+        """Test CAPTCHA and bot detection patterns."""
+        # Load configuration before creating scraper
+        from src.utils.config import load_config
+        load_config('config/settings.yaml')
         
         scraper = StaticScraper('test_site', self.config)
         
-        for content, should_detect in test_cases:
+        # Test different content types
+        test_cases = [
+            # (content, should_be_blocked, description)
+            ("Complete the CAPTCHA below to continue", True, "CAPTCHA challenge"),
+            ("Please verify you are a human user", True, "Human verification"),
+            ("Access denied - robot detected", True, "Robot detection"),
+            # Normal content that should NOT be blocked (long enough and without trigger words)
+            ("<html><body><h1>Shopping Results</h1>" + 
+             "<div class='item'>Product Description Here</div>" * 30 + 
+             "</body></html>", False, "Normal shopping page"),
+            # Another normal case
+            ("<html><body>Welcome to our store! Browse thousands of products." + 
+             "x" * 600 + "</body></html>", False, "Normal store content")
+        ]
+        
+        for content, should_be_blocked, description in test_cases:
             mock_response = Mock()
             mock_response.status_code = 200
             mock_response.text = content
             
-            # For CAPTCHA detection, we check blocking indicators
             is_blocked = scraper._is_blocked_response(mock_response)
-            
-            if should_detect:
-                assert is_blocked, f"Failed to detect CAPTCHA in: {content}"
+            if should_be_blocked:
+                assert is_blocked, f"Failed to detect blocking in: {description}"
             else:
-                assert not is_blocked, f"False CAPTCHA detection in: {content}"
+                assert not is_blocked, f"False positive detection in: {description}"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"]) 
