@@ -53,9 +53,13 @@ def main(ctx, config, verbose):
 @click.option('--sources', default='amazon,ebay', help='Comma-separated list of sources')
 @click.option('--keywords', required=True, help='Comma-separated search keywords')
 @click.option('--max-pages', default=5, help='Maximum pages per source')
+@click.option('--scraper-type', 
+              type=click.Choice(['static', 'selenium', 'scrapy', 'concurrent']),
+              default='static', help='Type of scraper to use')
+@click.option('--concurrent', is_flag=True, help='Use concurrent processing')
 @click.option('--output', default='data_output/raw', help='Output directory')
 @click.pass_context
-def scrape(ctx, sources, keywords, max_pages, output):
+def scrape(ctx, sources, keywords, max_pages, scraper_type, concurrent, output):
     """Start scraping products from specified sources."""
     from src.scrapers.manager import ScrapingManager
     
@@ -69,13 +73,56 @@ def scrape(ctx, sources, keywords, max_pages, output):
         # Initialize scraping manager
         manager = ScrapingManager(ctx.obj['config'])
         
-        # Run scraping
-        results = manager.scrape_all(
-            sources=source_list,
-            keywords=keyword_list,
-            max_pages=max_pages,
-            output_dir=output
-        )
+        # Handle different scraper types
+        if scraper_type == 'concurrent' or concurrent:
+            from src.utils.concurrent_manager import ConcurrentScrapingManager
+            
+            # Use concurrent processing
+            concurrent_manager = ConcurrentScrapingManager(ctx.obj['config'])
+            concurrent_manager.add_scraping_tasks(
+                sources=source_list,
+                keywords=keyword_list,
+                max_pages=max_pages,
+                scraper_type='static'
+            )
+            
+            # Define worker function
+            def scrape_worker(source, keyword, page, scraper_type):
+                return manager.scrape_single(source, keyword, page, scraper_type)
+            
+            results = concurrent_manager.execute_concurrent_scraping(scrape_worker)
+            
+        elif scraper_type == 'scrapy':
+            # Use Scrapy spider
+            click.echo("🕷️ Using Scrapy framework...")
+            from scrapy.crawler import CrawlerProcess
+            from src.scrapers.scrapy_spider import ProductSpider
+            
+            # Run Scrapy spider
+            process = CrawlerProcess({
+                'USER_AGENT': 'Mozilla/5.0 (compatible; ProductScraper/1.0)',
+                'ROBOTSTXT_OBEY': True,
+                'DOWNLOAD_DELAY': 2,
+            })
+            
+            for source in source_list:
+                for keyword in keyword_list:
+                    process.crawl(ProductSpider, 
+                                source=source, 
+                                keywords=keyword, 
+                                max_pages=max_pages)
+            
+            process.start()
+            results = []  # Scrapy handles data differently
+            
+        else:
+            # Use regular scraping manager
+            results = manager.scrape_all(
+                sources=source_list,
+                keywords=keyword_list,
+                max_pages=max_pages,
+                output_dir=output
+            )
         
         click.echo(f"✅ Scraping completed! Found {len(results)} products.")
         click.echo(f"📁 Data saved to: {output}")
@@ -170,6 +217,67 @@ def setup(ctx):
     except Exception as e:
         logger.error(f"Setup failed: {e}")
         raise click.ClickException(f"Setup error: {e}")
+
+@main.command()
+@click.option('--target', default=5000, help='Target number of records to collect')
+@click.option('--strategy', 
+              type=click.Choice(['comprehensive', 'quick', 'focused']),
+              default='comprehensive', help='Collection strategy')
+@click.pass_context
+def collect(ctx, target, strategy):
+    """Execute strategic data collection to reach target records."""
+    from src.utils.data_collection_strategy import DataCollectionStrategy
+    
+    logger.info(f"🎯 Starting strategic collection (target: {target} records)")
+    
+    try:
+        # Initialize strategic collector
+        collector = DataCollectionStrategy(ctx.obj['config'])
+        collector.target_records = target
+        
+        if strategy == 'comprehensive':
+            click.echo("🚀 Using comprehensive collection strategy...")
+            results = collector.execute_comprehensive_collection()
+        elif strategy == 'quick':
+            click.echo("⚡ Using quick collection strategy...")
+            # Quick strategy - fewer keywords, more sources
+            session_results = collector._execute_diverse_keywords()
+            results = {
+                'sessions': session_results,
+                'total_records': sum(s.get('records_found', 0) for s in session_results if s.get('success', False)),
+                'successful_sessions': sum(1 for s in session_results if s.get('success', False)),
+                'failed_sessions': sum(1 for s in session_results if not s.get('success', True)),
+                'strategies_used': ['diverse_keywords']
+            }
+        else:  # focused
+            click.echo("🎯 Using focused collection strategy...")
+            # Focused strategy - specific high-yield keywords
+            session_results = collector._execute_multi_source()
+            results = {
+                'sessions': session_results,
+                'total_records': sum(s.get('records_found', 0) for s in session_results if s.get('success', False)),
+                'successful_sessions': sum(1 for s in session_results if s.get('success', False)),
+                'failed_sessions': sum(1 for s in session_results if not s.get('success', True)),
+                'strategies_used': ['multi_source']
+            }
+        
+        # Generate report
+        report_path = collector.generate_collection_report(results)
+        
+        final_count = collector._get_current_record_count()
+        click.echo(f"✅ Collection completed!")
+        click.echo(f"📊 Records collected: {final_count:,}")
+        click.echo(f"📋 Report saved: {report_path}")
+        
+        if final_count >= target:
+            click.echo(f"🎉 TARGET ACHIEVED! {final_count:,} >= {target:,} records")
+        else:
+            click.echo(f"📈 Progress: {(final_count/target)*100:.1f}% of target")
+            click.echo("💡 Consider running again with different strategy or keywords")
+        
+    except Exception as e:
+        logger.error(f"Strategic collection failed: {e}")
+        raise click.ClickException(f"Collection error: {e}")
 
 @main.command()
 def test():

@@ -227,7 +227,7 @@ class FinalValidator:
             stats = ProductStatistics(self.config)
             
             # Test basic statistics (should work even with empty database)
-            basic_stats = stats.basic_statistics()
+            basic_stats = stats.get_basic_statistics()
             if basic_stats is None:
                 self.validation_results['warnings'].append(
                     "Basic statistics returned no data"
