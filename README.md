@@ -92,7 +92,7 @@ report_gen.generate_trend_report(results)
 ├── docs/                  # Documentation
 ├── data_output/           # Output files
 ├── config/                # Configuration files
-└── main.py               # Entry point
+└── main.py                # Entry point
 ```
 
 ## 🔧 Configuration
@@ -101,8 +101,8 @@ Edit `config/settings.yaml`:
 
 ```yaml
 scraping:
-  delay_range: [1, 3]
-  max_retries: 3
+  delay_range: [3, 8]
+  max_retries: 5
   timeout: 30
   user_agents: true
 
