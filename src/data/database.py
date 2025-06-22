@@ -283,6 +283,15 @@ class DatabaseManager(LoggerMixin):
             self.logger.error(f"Failed to get products: {e}")
             return []
     
+    def get_statistics(self) -> Dict[str, Any]:
+        """
+        Get comprehensive database statistics.
+        
+        Returns:
+            Dictionary containing database statistics
+        """
+        return self.get_product_stats()
+    
     def get_product_stats(self) -> Dict[str, Any]:
         """
         Get database statistics.

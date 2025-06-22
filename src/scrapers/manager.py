@@ -41,11 +41,53 @@ class ScrapingManager:
         # Initialize scrapers (will create them dynamically per source)
         self.scraper_classes = {
             'static': StaticScraper,
-            # 'selenium': SeleniumScraper,  # Will add later
-            # 'scrapy': ScrapyScraper,      # Will add later
+            # TODO: Add SeleniumScraper and ScrapyScraper when implemented
         }
         
         logger.info("ScrapingManager initialized")
+    
+    def get_scraper(self, scraper_type: str = 'static'):
+        """
+        Get a scraper instance by type.
+        
+        Args:
+            scraper_type: Type of scraper ('static', 'selenium', 'scrapy')
+            
+        Returns:
+            Scraper instance
+        """
+        if scraper_type in self.scraper_classes:
+            scraper_class = self.scraper_classes[scraper_type]
+            return scraper_class('amazon', self.config)  # Default to amazon for testing
+        else:
+            logger.warning(f"Unknown scraper type: {scraper_type}")
+            return None
+    
+    def scrape_single(self, source: str, keyword: str, page: int, scraper_type: str = 'static'):
+        """
+        Scrape a single page from a source.
+        
+        Args:
+            source: Source name
+            keyword: Search keyword
+            page: Page number
+            scraper_type: Type of scraper to use
+            
+        Returns:
+            List of products from the page
+        """
+        try:
+            scraper = self.get_scraper(scraper_type)
+            if not scraper:
+                return []
+                
+            # Create a minimal scraper for single page
+            result = scraper.scrape(keywords=[keyword], max_pages=1)
+            return result.data if result.success else []
+            
+        except Exception as e:
+            logger.error(f"Failed to scrape single page: {e}")
+            return []
     
     def scrape_all(
         self,
