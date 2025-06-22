@@ -1,32 +1,28 @@
 {
-  "timestamp": 1750602325.6462848,
-  "overall_status": "FAILED",
+  "timestamp": 1750624270.5300596,
+  "overall_status": "PASSED_WITH_WARNINGS",
   "test_results": {
+    "environment": true,
     "configuration": true,
     "file_structure": true,
     "database": true,
     "scrapers": true,
     "analysis": true,
-    "cli": true,
-    "unit_tests": false
+    "cli": false,
+    "unit_tests_output": "============================= test session starts =============================\nplatform win32 -- Python 3.12.6, pytest-8.4.1, pluggy-1.6.0 -- C:\\Users\\elchi\\Desktop\\Kiu\\Data Scraping\\Final Project\\Multi-Source-Data-Collection-System\\venv\\Scripts\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\elchi\\Desktop\\Kiu\\Data Scraping\\Final Project\\Multi-Source-Data-Collection-System\nconfigfile: pytest.ini\ncollecting ... collected 32 items\n\ntests/test_anti_bot.py::TestAntiBot::test_user_agent_rotation PASSED     [  3%]\ntests/test_anti_bot.py::TestAntiBot::test_random_headers_generation PASSED [  6%]\ntests/test_anti_bot.py::TestAntiBot::test_delay_functionality PASSED     [  9%]\ntests/test_anti_bot.py::TestAntiBot::test_proxy_decision_logic PASSED    [ 12%]\ntests/test_anti_bot.py::TestAntiBot::test_selenium_options_configuration PASSED [ 15%]\ntests/test_anti_bot.py::TestAntiBot::test_static_scraper_anti_bot_detection PASSED [ 18%]\ntests/test_anti_bot.py::TestAntiBot::test_static_scraper_request_headers PASSED [ 21%]\ntests/test_anti_bot.py::TestAntiBot::test_rate_limiting_implementation PASSED [ 25%]\ntests/test_anti_bot.py::TestAntiBot::test_captcha_detection_patterns PASSED [ 28%]\ntests/test_comprehensive.py::TestScrapers::test_scraping_manager_initialization PASSED [ 31%]\ntests/test_comprehensive.py::TestScrapers::test_selenium_scraper_initialization PASSED [ 34%]\ntests/test_comprehensive.py::TestScrapers::test_static_scraper_get_page_success PASSED [ 37%]\ntests/test_comprehensive.py::TestScrapers::test_static_scraper_initialization PASSED [ 40%]\ntests/test_comprehensive.py::TestHelperFunctions::test_clean_text PASSED [ 43%]\ntests/test_comprehensive.py::TestHelperFunctions::test_extract_price PASSED [ 46%]\ntests/test_comprehensive.py::TestHelperFunctions::test_extract_rating PASSED [ 50%]\ntests/test_comprehensive.py::TestHelperFunctions::test_get_random_headers PASSED [ 53%]\ntests/test_comprehensive.py::TestHelperFunctions::test_get_random_user_agent PASSED [ 56%]\ntests/test_comprehensive.py::TestHelperFunctions::test_random_delay PASSED [ 59%]\ntests/test_comprehensive.py::TestConcurrentProcessing::test_add_scraping_tasks PASSED [ 62%]\ntests/test_comprehensive.py::TestConcurrentProcessing::test_concurrent_manager_initialization PASSED [ 65%]\ntests/test_comprehensive.py::TestConcurrentProcessing::test_progress_stats PASSED [ 68%]\ntests/test_comprehensive.py::TestConcurrentProcessing::test_scraping_task_creation PASSED [ 71%]\ntests/test_comprehensive.py::TestDataAnalysis::test_basic_statistics PASSED [ 75%]\ntests/test_comprehensive.py::TestDataAnalysis::test_data_quality_report PASSED [ 78%]\ntests/test_comprehensive.py::TestDataAnalysis::test_keyword_analysis PASSED [ 81%]\ntests/test_comprehensive.py::TestDataAnalysis::test_price_analysis_by_source PASSED [ 84%]\ntests/test_comprehensive.py::TestVisualization::test_data_visualizer_initialization PASSED [ 87%]\ntests/test_comprehensive.py::TestVisualization::test_price_distribution_chart PASSED [ 90%]\ntests/test_comprehensive.py::TestConfiguration::test_get_config_function PASSED [ 93%]\ntests/test_comprehensive.py::TestConfiguration::test_load_config_function PASSED [ 96%]\ntests/test_comprehensive.py::TestIntegration::test_complete_scraping_workflow PASSED [100%]\n\n====================== 32 passed, 10 warnings in 11.63s =======================\n",
+    "unit_tests": true
   },
   "performance_metrics": {
-    "tests_passed": 0,
-    "tests_failed": 0,
-    "db_query_time_ms": 4.01,
-    "config_load_time_ms": 4.0,
-    "scraper_init_time_ms": 1.0
+    "db_query_time_ms": 9.0,
+    "config_load_time_ms": 0.0,
+    "scraper_init_time_ms": 0.0
   },
-  "errors": [
-    "Missing packages: beautifulsoup4, pyyaml"
-  ],
+  "errors": [],
   "warnings": [
-    "CLI command failed: python main.py --help",
-    "CLI command failed: python main.py setup --help",
-    "CLI command failed: python main.py scrape --help",
-    "CLI command failed: python main.py report --help",
-    "CLI command failed: python main.py export --help",
-    "Some unit tests failed:\n============================= test session starts =============================\nplatform win32 -- Python 3.12.6, pytest-8.3.5, pluggy-1.5.0 -- C:\\Users\\elchi\\AppData\\Local\\Programs\\Python\\Python312\\python.exe\ncachedir: .pytest_cache\nrootdir: C:\\Users\\elchi\\Desktop\\Kiu\\Data Scraping\\Final Project\\Multi-Source-Data-Collection-System\ncollecting ... collected 0 items / 2 errors\n\n=================================== ERRORS ====================================\n___________________ ERROR collecting tests/test_anti_bot.py ___________________\nImportError while importing test module 'C:\\Users\\elchi\\Desktop\\Kiu\\Data Scraping\\Final Project\\Multi-Source-Data-Collection-System\\tests\\test_anti_bot.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\nC:\\Users\\elchi\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\importlib\\__init__.py:90: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\ntests\\test_anti_bot.py:13: in <module>\n    from src.scrapers.static_scraper import StaticScraper\nsrc\\__init__.py:13: in <module>\n    from src.utils.config import load_config\nsrc\\utils\\__init__.py:11: in <module>\n    from .config import load_config, get_config\nsrc\\utils\\config.py:6: in <module>\n    import yaml\nE   ModuleNotFoundError: No module named 'yaml'\n________________ ERROR collecting tests/test_comprehensive.py _________________\nImportError while importing test module 'C:\\Users\\elchi\\Desktop\\Kiu\\Data Scraping\\Final Project\\Multi-Source-Data-Collection-System\\tests\\test_comprehensive.py'.\nHint: make sure your test modules/packages have valid Python names.\nTraceback:\nC:\\Users\\elchi\\AppData\\Local\\Programs\\Python\\Python312\\Lib\\importlib\\__init__.py:90: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\ntests\\test_comprehensive.py:20: in <module>\n    from src.scrapers.static_scraper import StaticScraper\nsrc\\__init__.py:13: in <module>\n    from src.utils.config import load_config\nsrc\\utils\\__init__.py:11: in <module>\n    from .config import load_config, get_config\nsrc\\utils\\config.py:6: in <module>\n    import yaml\nE   ModuleNotFoundError: No module named 'yaml'\n============================== warnings summary ===============================\ntests\\test_comprehensive.py:13\n  C:\\Users\\elchi\\Desktop\\Kiu\\Data Scraping\\Final Project\\Multi-Source-Data-Collection-System\\tests\\test_comprehensive.py:13: DeprecationWarning: \n  Pyarrow will become a required dependency of pandas in the next major release of pandas (pandas 3.0),\n  (to allow more performant data types, such as the Arrow string type, and better interoperability with other libraries)\n  but was not found to be installed on your system.\n  If this would cause problems for you,\n  please provide us feedback at https://github.com/pandas-dev/pandas/issues/54466\n          \n    import pandas as pd\n\n-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html\n=========================== short test summary info ===========================\nERROR tests/test_anti_bot.py\nERROR tests/test_comprehensive.py\n!!!!!!!!!!!!!!!!!!! Interrupted: 2 errors during collection !!!!!!!!!!!!!!!!!!!\n======================== 1 warning, 2 errors in 0.71s =========================\n\n"
+    "CLI command issue: Main help (exit code: 1)",
+    "CLI command issue: Setup help (exit code: 1)",
+    "CLI command issue: Report help (exit code: 1)",
+    "CLI command issue: Export help (exit code: 1)"
   ],
-  "duration_seconds": 13.81
+  "duration_seconds": 20.49
 }
