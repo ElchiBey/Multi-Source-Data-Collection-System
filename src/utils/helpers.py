@@ -60,6 +60,10 @@ def extract_price(price_text: str) -> Optional[float]:
     if not price_text:
         return None
     
+    # Handle "Free" explicitly
+    if 'free' in price_text.lower():
+        return 0.0
+    
     # Remove currency symbols and non-numeric characters except decimal point
     price_clean = re.sub(r'[^\d.,]', '', price_text)
     

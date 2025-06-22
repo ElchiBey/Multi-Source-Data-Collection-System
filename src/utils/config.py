@@ -3,10 +3,24 @@ Configuration management module for loading and managing application settings.
 """
 
 import os
-import yaml
 from pathlib import Path
 from typing import Dict, Any, Optional
 import logging
+
+# Robust YAML import with fallbacks
+try:
+    import yaml
+except ImportError:
+    try:
+        import ruamel.yaml as yaml
+    except ImportError:
+        try:
+            # Try importing from different location
+            import PyYAML as yaml
+        except ImportError:
+            raise ImportError(
+                "Could not import yaml. Please install with: pip install PyYAML"
+            )
 
 logger = logging.getLogger(__name__)
 
