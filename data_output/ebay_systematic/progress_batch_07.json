@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-21T23:08:12.199644",
+  "batch": 7,
+  "batch_keywords": [
+    "book",
+    "vinyl",
+    "cd",
+    "dvd",
+    "magazine"
+  ],
+  "batch_records": 0,
+  "total_records": 0,
+  "target": 5000,
+  "progress_percent": 0.0
+}

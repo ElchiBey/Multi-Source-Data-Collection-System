@@ -1,0 +1,129 @@
+{
+  "collection_timestamp": "2025-06-21T19:42:30.012315",
+  "collection_time_seconds": 0.20448,
+  "total_products_collected": 0,
+  "total_in_database": 0,
+  "results_by_source": {
+    "ebay": {
+      "source": "ebay",
+      "total_products": 0,
+      "successful_keywords": 0,
+      "failed_keywords": 15,
+      "keywords_results": {
+        "laptop": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "smartphone": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "tablet": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "headphones": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "camera": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "watch": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "shoes": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "backpack": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "keyboard": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "mouse": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "book": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "tools": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "furniture": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "clothing": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "electronics": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        }
+      }
+    },
+    "walmart": {
+      "source": "walmart",
+      "total_products": 0,
+      "successful_keywords": 0,
+      "failed_keywords": 5,
+      "keywords_results": {
+        "laptop": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "phone": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "tablet": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "headphones": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "camera": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        }
+      }
+    },
+    "amazon": {
+      "source": "amazon",
+      "total_products": 0,
+      "successful_keywords": 0,
+      "failed_keywords": 3,
+      "keywords_results": {
+        "laptop": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "smartphone": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        },
+        "headphones": {
+          "success": false,
+          "error": "'ScrapingManager' object has no attribute 'scrape_products'"
+        }
+      }
+    }
+  },
+  "overall_success_rate": {
+    "ebay": "0/15",
+    "walmart": "0/5",
+    "amazon": "0/3"
+  }
+}

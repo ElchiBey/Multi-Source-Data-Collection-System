@@ -1,0 +1,26 @@
+{
+  "total_records": 0,
+  "collection_time": 50.388775,
+  "success_stats": {
+    "amazon": {
+      "attempted": 0,
+      "successful": 0,
+      "blocked": 0
+    },
+    "ebay": {
+      "attempted": 15,
+      "successful": 0,
+      "blocked": 15
+    },
+    "walmart": {
+      "attempted": 5,
+      "successful": 0,
+      "blocked": 5
+    }
+  },
+  "timestamp": "20250621_233923",
+  "sources": {
+    "ebay": 0,
+    "walmart": 0
+  }
+}

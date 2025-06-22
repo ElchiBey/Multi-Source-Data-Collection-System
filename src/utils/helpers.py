@@ -111,24 +111,23 @@ def normalize_url(url: str, base_url: str = "") -> str:
     
     return url
 
-def generate_data_hash(data: dict) -> str:
-    """Generate MD5 hash for data deduplication."""
-    # Create a string representation of key data fields
-    key_fields = ['title', 'url', 'price', 'source']
-    hash_string = ''.join(str(data.get(field, '')) for field in key_fields)
-    return hashlib.md5(hash_string.encode()).hexdigest()
-
-def generate_hash(data: str) -> str:
+def generate_hash(data: Union[str, dict]) -> str:
     """
     Generate MD5 hash for data deduplication.
     
     Args:
-        data: String data to hash
+        data: String data or dict to hash
         
     Returns:
         MD5 hash string
     """
-    return hashlib.md5(data.encode('utf-8')).hexdigest()
+    if isinstance(data, dict):
+        # Create a string representation of key data fields
+        key_fields = ['title', 'url', 'price', 'source']
+        hash_string = ''.join(str(data.get(field, '')) for field in key_fields)
+        return hashlib.md5(hash_string.encode()).hexdigest()
+    else:
+        return hashlib.md5(str(data).encode('utf-8')).hexdigest()
 
 def save_json(data: Any, filepath: str) -> None:
     """
@@ -211,7 +210,6 @@ def retry_on_failure(max_retries: int = 3, delay: float = 1.0):
     """
     def decorator(func):
         def wrapper(*args, **kwargs):
-            import time
             from src.utils.logger import get_logger
             
             logger = get_logger(func.__module__)

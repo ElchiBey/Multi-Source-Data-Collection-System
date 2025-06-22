@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-21T23:12:32.147768",
+  "batch": 8,
+  "batch_keywords": [
+    "bicycle",
+    "fitness",
+    "camping",
+    "sports",
+    "outdoor"
+  ],
+  "batch_records": 0,
+  "total_records": 0,
+  "target": 5000,
+  "progress_percent": 0.0
+}

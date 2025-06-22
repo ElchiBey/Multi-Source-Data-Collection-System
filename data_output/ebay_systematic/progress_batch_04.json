@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-21T22:56:03.102635",
+  "batch": 4,
+  "batch_keywords": [
+    "clothing",
+    "jacket",
+    "dress",
+    "shirt",
+    "pants"
+  ],
+  "batch_records": 0,
+  "total_records": 0,
+  "target": 5000,
+  "progress_percent": 0.0
+}

@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-21T22:42:03.668546",
+  "batch": 1,
+  "batch_keywords": [
+    "laptop",
+    "smartphone",
+    "tablet",
+    "smartwatch",
+    "headphones"
+  ],
+  "batch_records": 0,
+  "total_records": 0,
+  "target": 5000,
+  "progress_percent": 0.0
+}

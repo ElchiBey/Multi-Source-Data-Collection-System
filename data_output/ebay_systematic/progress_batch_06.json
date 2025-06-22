@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-21T23:04:01.344614",
+  "batch": 6,
+  "batch_keywords": [
+    "kitchen",
+    "bedding",
+    "curtains",
+    "mirror",
+    "plant"
+  ],
+  "batch_records": 0,
+  "total_records": 0,
+  "target": 5000,
+  "progress_percent": 0.0
+}

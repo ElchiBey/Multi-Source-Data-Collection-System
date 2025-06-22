@@ -5,6 +5,7 @@ Logging configuration and utilities for the Multi-Source Data Collection System.
 import logging
 import logging.handlers
 import sys
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any
 import os
@@ -205,7 +206,6 @@ def log_execution_time(func):
     Returns:
         Decorated function
     """
-    import time
     
     def wrapper(*args, **kwargs):
         logger = get_logger(func.__module__)

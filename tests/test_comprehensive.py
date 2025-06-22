@@ -29,28 +29,33 @@ from src.utils.helpers import (
     get_random_user_agent, get_random_headers, random_delay
 )
 
+# Base test configuration to reduce redundancy
+BASE_CONFIG = {
+    'database': {'url': 'sqlite:///:memory:'},
+    'scraping': {
+        'delay': {'min': 0.1, 'max': 0.2},
+        'retries': 2,
+        'timeout': 10,
+        'max_workers': 2,
+        'use_multiprocessing': False
+    },
+    'scrapers': {
+        'amazon': {
+            'selectors': {
+                'product_container': '.s-result-item',
+                'title': 'h2 a span',
+                'price': '.a-price .a-offscreen'
+            }
+        }
+    }
+}
+
 class TestScrapers(unittest.TestCase):
     """Test scraper components."""
     
     def setUp(self):
         """Set up test configuration."""
-        self.config = {
-            'database': {'url': 'sqlite:///:memory:'},
-            'scraping': {
-                'delay': {'min': 0.1, 'max': 0.2},
-                'retries': 2,
-                'timeout': 10
-            },
-            'scrapers': {
-                'amazon': {
-                    'selectors': {
-                        'product_container': '.s-result-item',
-                        'title': 'h2 a span',
-                        'price': '.a-price .a-offscreen'
-                    }
-                }
-            }
-        }
+        self.config = BASE_CONFIG.copy()
     
     def test_static_scraper_initialization(self):
         """Test StaticScraper initialization."""
@@ -180,12 +185,7 @@ class TestConcurrentProcessing(unittest.TestCase):
     
     def setUp(self):
         """Set up test configuration."""
-        self.config = {
-            'scraping': {
-                'max_workers': 2,
-                'use_multiprocessing': False
-            }
-        }
+        self.config = BASE_CONFIG.copy()
     
     def test_concurrent_manager_initialization(self):
         """Test ConcurrentScrapingManager initialization."""

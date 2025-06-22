@@ -10,7 +10,7 @@ This package contains common utilities used throughout the application:
 
 from .config import load_config, get_config
 from .logger import setup_logger, get_logger
-from .helpers import create_directories, clean_text, extract_price
+from .helpers import create_directories, clean_text, extract_price, generate_hash
 
 __all__ = [
     'load_config',
@@ -19,5 +19,6 @@ __all__ = [
     'get_logger',
     'create_directories',
     'clean_text',
-    'extract_price'
+    'extract_price',
+    'generate_hash'
 ] 

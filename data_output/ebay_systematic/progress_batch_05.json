@@ -1,0 +1,15 @@
+{
+  "timestamp": "2025-06-21T23:00:20.818098",
+  "batch": 5,
+  "batch_keywords": [
+    "furniture",
+    "lamp",
+    "chair",
+    "table",
+    "decor"
+  ],
+  "batch_records": 0,
+  "total_records": 0,
+  "target": 5000,
+  "progress_percent": 0.0
+}
