@@ -490,6 +490,11 @@ class SeleniumScraper(BaseScraper):
                 self.driver = None
                 self.wait = None
     
+    def cleanup(self) -> None:
+        """Alias for close() method for compatibility."""
+        self.close()
+
     def __del__(self):
         """Ensure browser is closed when object is destroyed."""
-        self.close() 
+        if hasattr(self, 'driver'):
+            self.close() 
