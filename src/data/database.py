@@ -53,13 +53,19 @@ class DatabaseManager(LoggerMixin):
                 db_path = Path(db_url.replace('sqlite:///', ''))
                 db_path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Create engine
-            self._engine = create_engine(
-                db_url,
-                echo=self.config.get('database', {}).get('echo', False),
-                pool_size=self.config.get('database', {}).get('pool_size', 10),
-                max_overflow=self.config.get('database', {}).get('max_overflow', 20)
-            )
+            # Create engine with appropriate parameters for the database type
+            engine_kwargs = {
+                'echo': self.config.get('database', {}).get('echo', False),
+            }
+            
+            # Only add pool parameters for non-SQLite databases
+            if not db_url.startswith('sqlite:'):
+                engine_kwargs.update({
+                    'pool_size': self.config.get('database', {}).get('pool_size', 10),
+                    'max_overflow': self.config.get('database', {}).get('max_overflow', 20)
+                })
+            
+            self._engine = create_engine(db_url, **engine_kwargs)
             
             # Create session factory
             self._session_factory = sessionmaker(bind=self._engine)

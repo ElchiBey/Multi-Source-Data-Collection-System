@@ -60,6 +60,7 @@ class Product(Base):
     search_keyword = Column(String(200))
     page_number = Column(Integer)
     position_on_page = Column(Integer)
+    scraper_type = Column(String(20), default='static')  # static, selenium, scrapy
     
     # Data quality and deduplication
     data_hash = Column(String(32))  # MD5 hash for deduplication
@@ -106,6 +107,7 @@ class Product(Base):
             'search_keyword': self.search_keyword,
             'page_number': self.page_number,
             'position_on_page': self.position_on_page,
+            'scraper_type': self.scraper_type,
             'is_valid': self.is_valid
         }
     
@@ -223,10 +225,10 @@ class PriceHistory(Base):
     
     # Create indexes
     __table_args__ = (
-        Index('idx_product_id', 'product_id'),
-        Index('idx_source_product_id', 'source_product_id'),
-        Index('idx_recorded_at', 'recorded_at'),
-        Index('idx_price', 'price'),
+        Index('idx_price_history_product_id', 'product_id'),
+        Index('idx_price_history_source_product_id', 'source_product_id'),
+        Index('idx_price_history_recorded_at', 'recorded_at'),
+        Index('idx_price_history_price', 'price'),
     )
     
     def __repr__(self) -> str:
