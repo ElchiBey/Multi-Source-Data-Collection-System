@@ -38,14 +38,13 @@ except ImportError:
     ScraperFactory = None
     FACTORY_AVAILABLE = False
 
-# Import Scrapy components (optional, in case Scrapy isn't installed)
+# Import Scrapy components
 try:
-    from .scrapy_crawler.spider import ProductSpider
-    from .scrapy_crawler.runner import ScrapyRunner
+    from .scrapy_spider import ProductSpider, ScrapyScraper
     SCRAPY_AVAILABLE = True
 except ImportError:
     ProductSpider = None
-    ScrapyRunner = None
+    ScrapyScraper = None
     SCRAPY_AVAILABLE = False
 
 __all__ = [
@@ -56,7 +55,7 @@ __all__ = [
     'ScrapingManager',
     'ScraperFactory',
     'ProductSpider',
-    'ScrapyRunner',
+    'ScrapyScraper',
     'SELENIUM_AVAILABLE',
     'MANAGER_AVAILABLE',
     'FACTORY_AVAILABLE',

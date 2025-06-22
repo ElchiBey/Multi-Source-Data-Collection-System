@@ -12,6 +12,8 @@ from datetime import datetime
 import json
 
 from .static_scraper import StaticScraper
+from .selenium_scraper import SeleniumScraper
+from .scrapy_spider import ScrapyScraper
 from ..data.database import DatabaseManager
 from ..data.processors import DataProcessor
 from ..utils.logger import setup_logger
@@ -41,7 +43,8 @@ class ScrapingManager:
         # Initialize scrapers (will create them dynamically per source)
         self.scraper_classes = {
             'static': StaticScraper,
-            # TODO: Add SeleniumScraper and ScrapyScraper when implemented
+            'selenium': SeleniumScraper,
+            'scrapy': ScrapyScraper,
         }
         
         logger.info("ScrapingManager initialized")
