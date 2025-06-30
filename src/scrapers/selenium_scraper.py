@@ -387,7 +387,7 @@ class AdvancedSeleniumScraper(BaseScraper):
     
     def _check_for_captcha(self) -> bool:
         """
-        Check if CAPTCHA is present on the page.
+        🛡️ Enhanced CAPTCHA detection with multiple detection methods.
         
         Returns:
             True if CAPTCHA detected
@@ -395,68 +395,362 @@ class AdvancedSeleniumScraper(BaseScraper):
         if not self.driver:
             return False
             
+        # Expanded CAPTCHA indicators
         captcha_indicators = [
-            "captcha",
-            "recaptcha", 
-            "hcaptcha",
-            "verify you are human",
-            "i'm not a robot",
-            "prove you're human",
-            "security check"
+            "captcha", "recaptcha", "hcaptcha", "cloudflare",
+            "verify you are human", "i'm not a robot", "prove you're human",
+            "security check", "suspicious activity", "unusual traffic",
+            "please verify", "verify your identity", "bot detection",
+            "are you a robot", "human verification", "challenge",
+            "access denied", "blocked", "forbidden", "rate limit",
+            "automated queries", "unusual activity", "confirm you're human"
+        ]
+        
+        # Enhanced element selectors
+        captcha_selectors = [
+            # reCAPTCHA
+            "iframe[src*='recaptcha']", ".g-recaptcha", "#g-recaptcha", "[class*='recaptcha']",
+            # hCaptcha
+            "iframe[src*='hcaptcha']", ".h-captcha", "#h-captcha", "[class*='hcaptcha']",
+            # Generic CAPTCHA
+            "div[class*='captcha']", "div[id*='captcha']", "#captcha", ".captcha",
+            # Cloudflare
+            ".cf-browser-verification", "#cf-wrapper", "[class*='cloudflare']",
+            # Challenge elements
+            "[class*='challenge']", "[id*='challenge']", "[class*='verification']", "[id*='verification']",
+            # Bot detection
+            "[class*='bot-protection']", "[class*='anti-bot']", "[class*='security-check']",
+            # Access denied pages
+            "[class*='access-denied']", "[class*='blocked']", "[class*='forbidden']"
         ]
         
         try:
-            page_source = self.driver.page_source.lower()
-            for indicator in captcha_indicators:
-                if indicator in page_source:
-                    self.logger.warning(f"CAPTCHA detected: {indicator}")
-                    return True
-                    
-            # Check for common CAPTCHA elements
-            captcha_selectors = [
-                "iframe[src*='recaptcha']",
-                "div[class*='captcha']",
-                "div[id*='captcha']",
-                ".g-recaptcha",
-                "#captcha"
-            ]
+            confidence_score = 0
+            detected_indicators = []
             
+            # Method 1: Text-based detection
+            page_source = self.driver.page_source.lower()
+            page_text = self.driver.find_element(By.TAG_NAME, "body").text.lower()
+            
+            for indicator in captcha_indicators:
+                if indicator in page_source or indicator in page_text:
+                    detected_indicators.append(indicator)
+                    if indicator in ["captcha", "recaptcha", "hcaptcha", "cloudflare"]:
+                        confidence_score += 0.4
+                    elif indicator in ["verify you are human", "i'm not a robot", "bot detection"]:
+                        confidence_score += 0.3
+                    else:
+                        confidence_score += 0.1
+            
+            # Method 2: Element-based detection
+            found_elements = []
             for selector in captcha_selectors:
-                elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
-                if elements:
-                    self.logger.warning(f"CAPTCHA element found: {selector}")
-                    return True
+                try:
+                    elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if elements:
+                        # Check if elements are visible
+                        visible_elements = [elem for elem in elements if elem.is_displayed()]
+                        if visible_elements:
+                            found_elements.append(selector)
+                            if any(term in selector for term in ["recaptcha", "hcaptcha", "cloudflare"]):
+                                confidence_score += 0.5
+                            else:
+                                confidence_score += 0.2
+                except Exception:
+                    continue
+            
+            # Method 3: URL-based detection
+            current_url = self.driver.current_url.lower()
+            url_patterns = ["captcha", "recaptcha", "challenge", "verify", "security", "blocked"]
+            url_matches = [p for p in url_patterns if p in current_url]
+            if url_matches:
+                confidence_score += 0.3
+                detected_indicators.extend([f"url:{p}" for p in url_matches])
+            
+            # Method 4: Title-based detection
+            title = self.driver.title.lower()
+            title_indicators = ["captcha", "verify", "security", "challenge", "access denied", "blocked"]
+            title_matches = [t for t in title_indicators if t in title]
+            if title_matches:
+                confidence_score += 0.25
+                detected_indicators.extend([f"title:{t}" for t in title_matches])
+            
+            # Determine if CAPTCHA is detected
+            captcha_detected = confidence_score > 0.3
+            
+            if captcha_detected:
+                # Determine CAPTCHA type
+                captcha_type = "unknown"
+                if any("recaptcha" in ind for ind in detected_indicators + found_elements):
+                    captcha_type = "reCAPTCHA"
+                elif any("hcaptcha" in ind for ind in detected_indicators + found_elements):
+                    captcha_type = "hCAPTCHA"
+                elif any("cloudflare" in ind for ind in detected_indicators + found_elements):
+                    captcha_type = "Cloudflare"
+                elif detected_indicators or found_elements:
+                    captcha_type = "Generic CAPTCHA"
+                
+                self.logger.warning(f"🛡️ CAPTCHA DETECTED: {captcha_type} (confidence: {confidence_score:.2f})")
+                self.logger.info(f"📊 Detection details: Text indicators: {len(detected_indicators)}, Elements: {len(found_elements)}, URL matches: {len(url_matches)}")
+                
+                # Log detected elements for debugging
+                if found_elements:
+                    self.logger.debug(f"🔍 CAPTCHA elements found: {found_elements[:3]}...")  # Show first 3
+                if detected_indicators:
+                    self.logger.debug(f"🔍 Text indicators: {detected_indicators[:3]}...")  # Show first 3
+                
+                return True
+            
+            return False
                     
         except Exception as e:
-            self.logger.debug(f"Error checking for CAPTCHA: {e}")
-            
-        return False
+            self.logger.debug(f"Error in enhanced CAPTCHA detection: {e}")
+            return False
     
     def _handle_captcha(self) -> bool:
         """
-        Handle CAPTCHA detection.
+        🛡️ Advanced CAPTCHA handling with multiple strategies.
         
         Returns:
             True if CAPTCHA was handled successfully
         """
-        self.logger.warning("CAPTCHA detected - implementing handling strategy")
+        self.logger.warning("🛡️ CAPTCHA detected - implementing advanced handling strategy")
         
-        # Strategy 1: Wait and retry
-        self.logger.info("Waiting for CAPTCHA to be resolved...")
-        time.sleep(random.uniform(10, 30))
+        max_attempts = 3
+        attempt = 0
         
-        # Strategy 2: Refresh page
-        if self._check_for_captcha():
-            self.logger.info("Refreshing page to bypass CAPTCHA")
+        # Determine CAPTCHA type for specialized handling
+        page_source = self.driver.page_source.lower()
+        current_url = self.driver.current_url.lower()
+        
+        # Identify CAPTCHA type
+        captcha_type = "generic"
+        if "cloudflare" in page_source or "cloudflare" in current_url:
+            captcha_type = "cloudflare"
+        elif "recaptcha" in page_source:
+            captcha_type = "recaptcha"
+        elif "hcaptcha" in page_source:
+            captcha_type = "hcaptcha"
+        
+        self.logger.info(f"🎯 Detected CAPTCHA type: {captcha_type}")
+        
+        while attempt < max_attempts:
+            attempt += 1
+            self.logger.info(f"🔄 CAPTCHA handling attempt {attempt}/{max_attempts}")
+            
+            try:
+                if captcha_type == "cloudflare":
+                    success = self._handle_cloudflare_challenge()
+                elif captcha_type in ["recaptcha", "hcaptcha"]:
+                    success = self._handle_interactive_captcha()
+                else:
+                    success = self._handle_generic_captcha()
+                
+                if success:
+                    self.logger.info(f"✅ CAPTCHA resolved successfully using {captcha_type} strategy")
+                    return True
+                
+                # Progressive delay between attempts
+                delay = random.uniform(10 + (attempt * 5), 20 + (attempt * 10))
+                self.logger.info(f"⏳ Waiting {delay:.1f}s before next attempt...")
+                time.sleep(delay)
+                
+            except Exception as e:
+                self.logger.error(f"❌ CAPTCHA handling error (attempt {attempt}): {e}")
+        
+        # Final check
+        if not self._check_for_captcha():
+            self.logger.info("✅ CAPTCHA resolved during handling process")
+            return True
+        
+        self.logger.error("❌ CAPTCHA handling failed after all attempts")
+        return False
+    
+    def _handle_cloudflare_challenge(self) -> bool:
+        """Handle Cloudflare-specific challenges."""
+        self.logger.info("☁️ Handling Cloudflare challenge")
+        
+        try:
+            # Wait for Cloudflare automatic verification
+            self.logger.info("⏳ Waiting for Cloudflare automatic verification...")
+            
+            # Look for Cloudflare challenge elements
+            challenge_selectors = [
+                ".cf-browser-verification",
+                "#cf-wrapper",
+                "[class*='cloudflare']"
+            ]
+            
+            # Wait up to 30 seconds for challenge to complete
+            wait_time = 0
+            max_wait = 30
+            
+            while wait_time < max_wait:
+                # Check if challenge elements are gone
+                challenge_present = False
+                for selector in challenge_selectors:
+                    try:
+                        elements = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                        if elements and any(elem.is_displayed() for elem in elements):
+                            challenge_present = True
+                            break
+                    except Exception:
+                        continue
+                
+                if not challenge_present:
+                    self.logger.info("✅ Cloudflare challenge completed automatically")
+                    return True
+                
+                time.sleep(2)
+                wait_time += 2
+            
+            # If still present, try refresh
+            self.logger.info("🔄 Cloudflare challenge timeout - trying refresh")
             self.driver.refresh()
-            time.sleep(random.uniform(5, 10))
+            time.sleep(random.uniform(10, 20))
             
-        # Strategy 3: Change user agent and retry
-        if self._check_for_captcha():
-            self.logger.warning("CAPTCHA still present - may need manual intervention")
+            return not self._check_for_captcha()
+            
+        except Exception as e:
+            self.logger.error(f"❌ Cloudflare handling failed: {e}")
             return False
+    
+    def _handle_interactive_captcha(self) -> bool:
+        """Handle interactive CAPTCHAs (reCAPTCHA, hCAPTCHA)."""
+        self.logger.info("🧩 Handling interactive CAPTCHA")
+        
+        try:
+            # Strategy 1: Advanced stealth behavior
+            self._simulate_human_behavior_advanced()
             
-        return True
+            # Strategy 2: Wait with human-like patterns
+            wait_time = random.uniform(20, 45)
+            self.logger.info(f"⏳ Human-like waiting: {wait_time:.1f}s")
+            time.sleep(wait_time)
+            
+            # Strategy 3: Check if resolved
+            if not self._check_for_captcha():
+                return True
+            
+            # Strategy 4: Browser fingerprint changes
+            self._change_browser_characteristics()
+            
+            # Strategy 5: Page refresh with stealth
+            self.logger.info("🔄 Stealth page refresh")
+            self.driver.refresh()
+            time.sleep(random.uniform(8, 15))
+            
+            return not self._check_for_captcha()
+            
+        except Exception as e:
+            self.logger.error(f"❌ Interactive CAPTCHA handling failed: {e}")
+            return False
+    
+    def _handle_generic_captcha(self) -> bool:
+        """Handle generic CAPTCHA challenges."""
+        self.logger.info("🔧 Handling generic CAPTCHA")
+        
+        try:
+            # Strategy 1: Clear cookies and refresh
+            self.logger.info("🍪 Clearing cookies")
+            self.driver.delete_all_cookies()
+            time.sleep(2)
+            
+            # Strategy 2: Change user agent
+            self._rotate_user_agent()
+            
+            # Strategy 3: Change viewport
+            self._change_viewport_size()
+            
+            # Strategy 4: Refresh and wait
+            self.driver.refresh()
+            time.sleep(random.uniform(10, 20))
+            
+            return not self._check_for_captcha()
+            
+        except Exception as e:
+            self.logger.error(f"❌ Generic CAPTCHA handling failed: {e}")
+            return False
+    
+    def _simulate_human_behavior_advanced(self) -> None:
+        """Simulate advanced human-like behavior patterns."""
+        try:
+            actions = ActionChains(self.driver)
+            
+            # Random mouse movements with curves
+            for _ in range(random.randint(3, 6)):
+                # Create curved movement
+                start_x, start_y = random.randint(50, 300), random.randint(50, 300)
+                end_x, end_y = random.randint(400, 800), random.randint(200, 600)
+                
+                # Generate smooth curve points
+                steps = random.randint(5, 10)
+                for i in range(steps):
+                    t = i / steps
+                    # Bezier-like curve with randomness
+                    x = start_x + (end_x - start_x) * t + random.randint(-20, 20)
+                    y = start_y + (end_y - start_y) * t + random.randint(-20, 20)
+                    
+                    actions.move_by_offset(x - (start_x if i == 0 else 0), 
+                                         y - (start_y if i == 0 else 0))
+                    actions.pause(random.uniform(0.1, 0.4))
+            
+            # Random scrolling with pauses
+            for _ in range(random.randint(2, 4)):
+                scroll_amount = random.randint(100, 400)
+                direction = random.choice([1, -1])
+                self.driver.execute_script(f"window.scrollBy(0, {scroll_amount * direction});")
+                time.sleep(random.uniform(0.5, 2.0))
+            
+            actions.perform()
+            self.logger.debug("🎭 Advanced human behavior simulation completed")
+            
+        except Exception as e:
+            self.logger.debug(f"Human behavior simulation error: {e}")
+    
+    def _change_browser_characteristics(self) -> None:
+        """Change browser characteristics to avoid detection."""
+        try:
+            # Change viewport size
+            sizes = [(1920, 1080), (1366, 768), (1440, 900), (1280, 720), (1600, 900)]
+            width, height = random.choice(sizes)
+            self.driver.set_window_size(width, height)
+            
+            # Change user agent if possible
+            self._rotate_user_agent()
+            
+            self.logger.debug(f"🔄 Changed browser characteristics: {width}x{height}")
+            
+        except Exception as e:
+            self.logger.debug(f"Browser characteristic change error: {e}")
+    
+    def _rotate_user_agent(self) -> None:
+        """Rotate user agent string."""
+        try:
+            user_agents = [
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            ]
+            
+            new_ua = random.choice(user_agents)
+            self.driver.execute_cdp_cmd('Network.setUserAgentOverride', {"userAgent": new_ua})
+            self.logger.debug("🔄 User agent rotated")
+            
+        except Exception as e:
+            self.logger.debug(f"User agent rotation error: {e}")
+    
+    def _change_viewport_size(self) -> None:
+        """Change browser viewport size."""
+        try:
+            sizes = [(1920, 1080), (1366, 768), (1440, 900), (1280, 720), (1600, 900)]
+            width, height = random.choice(sizes)
+            self.driver.set_window_size(width, height)
+            self.logger.debug(f"📐 Viewport changed to {width}x{height}")
+            
+        except Exception as e:
+            self.logger.debug(f"Viewport change error: {e}")
     
     def _scrape_page(self, keyword: str, page: int) -> List[Dict[str, Any]]:
         """

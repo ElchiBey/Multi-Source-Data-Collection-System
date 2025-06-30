@@ -227,6 +227,8 @@ class ScrapingManager:
                         
                 except Exception as e:
                     logger.warning(f"⚠️ Static task failed {task['source']}/{task['keyword']}: {e}")
+                    # Also log at info level so it shows in regular output
+                    logger.info(f"🚫 {task['source']} blocked static request for '{task['keyword']}' (anti-bot protection)")
         
         return all_results
     

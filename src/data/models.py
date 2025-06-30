@@ -3,7 +3,7 @@ Database models for the Multi-Source Data Collection System.
 """
 
 from sqlalchemy import Column, Integer, String, Float, DateTime, Text, Boolean, Index
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import declarative_base
 from sqlalchemy.sql import func
 from datetime import datetime
 from typing import Optional, Dict, Any

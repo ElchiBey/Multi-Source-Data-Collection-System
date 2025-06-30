@@ -92,7 +92,7 @@ class DataVisualizer:
             ax1.grid(True, alpha=0.3)
             
             # 2. Box plot
-            ax2.boxplot(prices, vert=True)
+            ax2.boxplot(prices, orientation='vertical')
             ax2.set_title('Price Box Plot')
             ax2.set_ylabel('Price ($)')
             ax2.grid(True, alpha=0.3)
@@ -157,7 +157,7 @@ class DataVisualizer:
             source_prices = [price_data[price_data['source'] == source]['price'] 
                            for source in sources]
             
-            plt.boxplot(source_prices, labels=sources)
+            plt.boxplot(source_prices, tick_labels=sources)
             plt.title('Price Distribution by Source', fontsize=14, fontweight='bold')
             plt.xlabel('Source')
             plt.ylabel('Price ($)')

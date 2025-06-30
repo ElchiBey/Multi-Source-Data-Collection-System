@@ -147,6 +147,11 @@ def scrape_parallel(ctx, sources, keywords, max_pages, hybrid, output_dir):
     keyword_list = [k.strip() for k in keywords.split(',')]
     source_list = [s.strip() for s in sources.split(',')]
     
+    # Auto-disable hybrid for eBay-only scraping (eBay needs Selenium due to protection)
+    if len(source_list) == 1 and source_list[0].lower() == 'ebay' and hybrid:
+        click.echo("⚠️  [AUTO-ADJUST] eBay detected - switching to Selenium-only mode for better results")
+        hybrid = False
+    
     click.echo(f"🚀 [TURBO] Starting HIGH-PERFORMANCE parallel scraping")
     click.echo(f"📊 [CONFIG] Sources: {source_list}")
     click.echo(f"🔍 [CONFIG] Keywords: {keyword_list}")
@@ -168,6 +173,13 @@ def scrape_parallel(ctx, sources, keywords, max_pages, hybrid, output_dir):
         click.echo(f"🎉 [SUCCESS] Parallel scraping completed!")
         click.echo(f"📊 [RESULTS] Total products scraped: {len(results)}")
         click.echo(f"💾 [OUTPUT] Data saved to: {output_dir}")
+        
+        if len(results) == 0:
+            click.echo("⚠️  [WARNING] No products were collected. This may be due to:")
+            click.echo("   • Anti-bot protection blocking requests")
+            click.echo("   • Invalid source/keyword combinations")
+            click.echo("   • Network connectivity issues")
+            click.echo("💡 [TIP] Try using --no-hybrid for selenium-only mode, or check logs for details")
         
     except Exception as e:
         click.echo(f"❌ [ERROR] Parallel scraping failed: {e}")
@@ -293,10 +305,10 @@ def collect(ctx, target, strategy):
             click.echo("[STRATEGY] Using comprehensive collection strategy...")
             results = collector.execute_comprehensive_collection()
         elif strategy == 'quick':
-            from src.utils.optimized_collection import OptimizedCollector
-            opt_collector = OptimizedCollector(ctx.obj['config'])
+            from src.utils.optimized_collection import OptimizedCollectionStrategy
+            opt_collector = OptimizedCollectionStrategy(ctx.obj['config'])
             click.echo("[STRATEGY] Using quick collection strategy...")
-            results = opt_collector.execute_comprehensive_collection()
+            results = opt_collector.execute_optimized_collection(target)
         else:  # focused
             click.echo("[STRATEGY] Using focused collection strategy...")
             results = collector.execute_comprehensive_collection()
@@ -304,7 +316,8 @@ def collect(ctx, target, strategy):
         # Get final count from database
         from src.data.database import DatabaseManager
         db = DatabaseManager()
-        final_count = db.get_total_products()
+        stats = db.get_product_stats()
+        final_count = stats.get('total_products', 0)
         
         # Generate collection report
         report_path = collector.generate_collection_report(results)
@@ -393,26 +406,33 @@ def hyper(ctx, target, browsers, sources, keywords, max_pages):
 @click.pass_context
 def turbo(ctx, target, workers, batch_size):
     """[TURBO MODE] High-speed optimized data collection (5-10x faster)."""
-    from src.utils.optimized_collection import OptimizedCollector
+    from src.utils.optimized_collection import OptimizedCollectionStrategy
     
     logger.info(f"[TURBO] Starting mode: Collecting {target:,} records with {workers} workers")
     
     try:
+        # Update config with worker settings
+        config = ctx.obj['config'].copy()
+        config.setdefault('collection', {})
+        config['collection']['max_workers'] = workers
+        config['collection']['batch_size'] = batch_size
+        
         # Initialize optimized collector
-        collector = OptimizedCollector(ctx.obj['config'])
+        collector = OptimizedCollectionStrategy(config)
         
         # Execute turbo collection
-        results = collector.turbo_collection(target)
+        results = collector.execute_optimized_collection(target)
         
         # Display comprehensive results
         click.echo(f"[TURBO] Collection Complete!")
-        click.echo(f"[BATCH] Batches processed: {results['batches_processed']}")
-        click.echo(f"[WORKERS] Parallel workers: {results['workers_used']}")
+        click.echo(f"[BATCH] Batches processed: {results.get('batches_processed', 0)}")
+        click.echo(f"[WORKERS] Parallel workers: {workers}")
         click.echo(f"[RECORDS] Final count: {results['total_records']:,} records")
         click.echo(f"[TIME] Total time: {results['total_time']:.1f} seconds")
         click.echo(f"[SPEED] Performance: {results['records_per_second']:.1f} records/second")
+        click.echo(f"[SUCCESS] Success rate: {results.get('success_rate', 0):.1f}%")
         
-        if results['total_records'] >= target:
+        if results.get('target_achieved', False):
             click.echo(f"[TARGET] TARGET ACHIEVED! {results['total_records']:,} >= {target:,}")
         else:
             click.echo(f"[TARGET] Partial completion: {results['total_records']:,}/{target:,}")
