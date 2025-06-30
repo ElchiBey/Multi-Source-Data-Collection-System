@@ -97,7 +97,8 @@ class ScrapingManager:
         sources: List[str],
         keywords: List[str],
         max_pages: int = 5,
-        output_dir: str = 'data_output/raw'
+        output_dir: str = 'data_output/raw',
+        scraper_type: str = 'static'
     ) -> List[Dict[str, Any]]:
         """
         Scrape products from multiple sources.
@@ -116,7 +117,7 @@ class ScrapingManager:
         all_results = []
         
         # Create scraping session
-        session_id = self._create_scraping_session(sources, keywords, max_pages)
+        session_id = self._create_scraping_session(sources, keywords, max_pages, scraper_type)
         
         try:
             # Scrape each source
@@ -129,7 +130,7 @@ class ScrapingManager:
                 
                 try:
                     # Create scraper instance for this source
-                    scraper_class = self.scraper_classes['static']
+                    scraper_class = self.scraper_classes.get(scraper_type, self.scraper_classes['static'])
                     scraper = scraper_class(source, self.config)
                     
                     source_results = []
@@ -177,7 +178,7 @@ class ScrapingManager:
             self._update_scraping_session(session_id, 0, error=str(e))
             raise
     
-    def _create_scraping_session(self, sources: List[str], keywords: List[str], max_pages: int) -> str:
+    def _create_scraping_session(self, sources: List[str], keywords: List[str], max_pages: int, scraper_type: str = 'static') -> str:
         """Create a new scraping session."""
         try:
             session = self.db_manager.create_scraping_session(
@@ -186,7 +187,7 @@ class ScrapingManager:
                 config={
                     'max_pages': max_pages,
                     'sources': sources,
-                    'scraper_type': 'static'
+                    'scraper_type': scraper_type
                 }
             )
             return session.session_id

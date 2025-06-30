@@ -117,12 +117,13 @@ def scrape(ctx, sources, keywords, max_pages, scraper_type, concurrent, output):
             results = []  # Scrapy handles data differently
             
         else:
-            # Use regular scraping manager
+            # Use regular scraping manager with specified scraper type
             results = manager.scrape_all(
                 sources=source_list,
                 keywords=keyword_list,
                 max_pages=max_pages,
-                output_dir=output
+                output_dir=output,
+                scraper_type=scraper_type
             )
         
         click.echo(f"✅ Scraping completed! Found {len(results)} products.")
@@ -300,6 +301,51 @@ def test():
             
     except FileNotFoundError:
         raise click.ClickException("pytest not found. Install with: pip install pytest")
+
+@main.command()
+@click.option('--target', default=2000, help='Target number of records to collect')
+@click.option('--browsers', default=4, help='Number of parallel browser instances')
+@click.option('--sources', default='amazon,ebay,walmart', help='Comma-separated sources')
+@click.option('--keywords', default='laptop,phone,tablet,headphones', help='Comma-separated keywords')
+@click.option('--max-pages', default=3, help='Maximum pages per keyword')
+@click.pass_context
+def hyper(ctx, target, browsers, sources, keywords, max_pages):
+    """🚀 HYPER MODE: Parallel Selenium with maximum anti-bot protection (10-20x faster)."""
+    from src.utils.parallel_selenium_manager import ParallelSeleniumManager
+    
+    logger.info(f"🚀 HYPER MODE: {browsers} parallel browsers targeting {target:,} records")
+    
+    try:
+        # Parse inputs
+        source_list = [s.strip() for s in sources.split(',')]
+        keyword_list = [k.strip() for k in keywords.split(',')]
+        
+        # Create parallel Selenium manager
+        parallel_manager = ParallelSeleniumManager(ctx.obj['config'], max_browsers=browsers)
+        
+        # Execute parallel scraping
+        start_time = time.time()
+        results = parallel_manager.execute_parallel_scraping(
+            sources=source_list,
+            keywords=keyword_list,
+            max_pages=max_pages,
+            target_products=target
+        )
+        
+        execution_time = time.time() - start_time
+        
+        # Display results
+        click.echo(f"\n🎉 HYPER MODE COMPLETED!")
+        click.echo(f"⏱️  Execution time: {execution_time:.1f}s")
+        click.echo(f"📦 Products collected: {results['total_products']:,}")
+        click.echo(f"⚡ Speed: {results['products_per_second']:.1f} products/second")
+        click.echo(f"🎯 Target: {'ACHIEVED' if results['target_achieved'] else 'PARTIAL'}")
+        click.echo(f"🤖 Browsers used: {results['browsers_used']}")
+        click.echo(f"✅ Success rate: {(results['tasks_completed']/(results['tasks_completed']+results['tasks_failed'])*100):.1f}%" if results['tasks_completed']+results['tasks_failed'] > 0 else "N/A")
+        
+    except Exception as e:
+        logger.error(f"HYPER mode failed: {e}")
+        raise click.ClickException(f"HYPER error: {e}")
 
 @main.command()
 @click.option('--target', default=5000, help='Target number of records to collect')

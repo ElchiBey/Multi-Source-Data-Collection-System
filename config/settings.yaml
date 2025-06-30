@@ -20,6 +20,60 @@ scraping:
   # Concurrent workers
   max_workers: 5
 
+# Anti-Bot Protection Settings
+anti_bot:
+  # Enable maximum stealth mode
+  stealth_mode: true
+  
+  # Use undetected chromedriver (requires installation)
+  use_undetected_chrome: true
+  
+  # Human behavior simulation
+  simulate_human_behavior: true
+  mouse_movements: true
+  random_scrolling: true
+  typing_delays: true
+  
+  # Advanced fingerprint randomization
+  randomize_fingerprints: true
+  random_user_agents: true
+  random_viewports: true
+  random_timezones: true
+  
+  # CAPTCHA handling
+  captcha_detection: true
+  auto_captcha_handling: true
+  captcha_wait_time: [10, 30]
+  
+  # Request timing
+  page_load_timeout: 30
+  element_timeout: 10
+  random_delays: [2, 8]
+
+# Parallel Selenium Settings
+parallel_selenium:
+  # Maximum browser instances
+  max_browsers: 4
+  
+  # Task distribution
+  task_prioritization: true
+  retry_failed_tasks: true
+  max_retries: 3
+  
+  # Worker configuration
+  worker_timeout: 60
+  task_timeout: 30
+  progress_reporting: 5  # Report every N tasks
+  
+  # Performance optimization
+  browser_reuse: true
+  intelligent_load_balancing: true
+  dynamic_scaling: true
+  
+  # Resource management
+  memory_cleanup: true
+  browser_lifecycle: 300  # seconds before browser refresh
+  
 # NEW: Optimized Collection Settings
 collection:
   # Maximum parallel workers for turbo mode

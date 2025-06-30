@@ -1,12 +1,13 @@
 """
-Selenium scraper implementation for dynamic content.
+Advanced Selenium Scraper with Anti-Bot Protection
 
-This scraper handles JavaScript-heavy websites and dynamic content loading.
-Includes advanced anti-bot detection evasion techniques.
+This module implements a sophisticated Selenium-based scraper with multiple
+anti-detection techniques to bypass modern bot protection systems.
 """
 
-import time
 import random
+import time
+import json
 from typing import Dict, List, Any, Optional
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -21,101 +22,343 @@ from selenium.common.exceptions import (
 )
 from webdriver_manager.chrome import ChromeDriverManager
 
-from .base_scraper import BaseScraper
+# Try to import undetected-chromedriver for advanced stealth
+try:
+    import undetected_chromedriver as uc
+    UNDETECTED_AVAILABLE = True
+except ImportError:
+    UNDETECTED_AVAILABLE = False
+
+from .base_scraper import BaseScraper, ScrapingResult
 from src.utils.helpers import (
     extract_price, extract_rating, clean_text, normalize_url,
     get_selenium_options, random_delay
 )
 
-class SeleniumScraper(BaseScraper):
+class AdvancedSeleniumScraper(BaseScraper):
     """
-    Selenium scraper for dynamic content with anti-bot protection.
+    🥷 Advanced Selenium scraper with state-of-the-art anti-bot protection.
     
     Features:
-    - Stealth mode configuration
-    - Human-like behavior simulation
-    - CAPTCHA detection and handling
-    - Advanced evasion techniques
+    - Undetected Chrome driver
+    - Stealth fingerprint randomization  
+    - Human behavior simulation
+    - Advanced CAPTCHA handling
+    - Proxy rotation support
+    - Browser profile management
     """
     
     def __init__(self, source: str, config: Dict[str, Any]):
-        """
-        Initialize Selenium scraper.
-        
-        Args:
-            source: Source name (amazon, ebay, walmart)
-            config: Configuration dictionary
-        """
         super().__init__(source, config)
         self.driver = None
         self.wait = None
+        self.stealth_mode = config.get('stealth_mode', True)
+        self.use_undetected = config.get('use_undetected_chrome', UNDETECTED_AVAILABLE)
+        
+        # Advanced anti-bot settings
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        ]
         
         # Load scraper-specific selectors
+        self._load_source_config()
+        
+    def _load_source_config(self):
+        """Load source-specific configuration and selectors."""
         try:
             from src.utils.config import load_config
             scraper_config = load_config('config/scrapers.yaml')
-            self.selectors = scraper_config.get(source, {}).get('selectors', {})
+            self.selectors = scraper_config.get(self.source, {}).get('selectors', {})
+            self.source_config = scraper_config.get(self.source, {})
         except Exception as e:
-            self.logger.warning(f"Failed to load selectors for {source}: {e}")
+            self.logger.warning(f"Failed to load selectors for {self.source}: {e}")
             self.selectors = {}
+            self.source_config = {}
     
-    def _setup_driver(self) -> webdriver.Chrome:
+    def _setup_stealth_driver(self) -> webdriver.Chrome:
         """
-        Setup Chrome driver with anti-bot protection.
+        🥷 Setup ultra-stealth Chrome driver with advanced anti-detection.
         
         Returns:
-            Configured Chrome WebDriver instance
+            Stealth-configured Chrome WebDriver instance
         """
         try:
-            # Get anti-bot Chrome options
-            options = get_selenium_options()
-            
-            # Additional stealth options
-            options.add_argument('--disable-web-security')
-            options.add_argument('--disable-features=VizDisplayCompositor')
-            options.add_argument('--disable-ipc-flooding-protection')
-            
-            # Disable automation indicators
-            options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
-            options.add_experimental_option('useAutomationExtension', False)
-            
-            # Setup service
+            if self.use_undetected and UNDETECTED_AVAILABLE:
+                self.logger.info("🥷 Using undetected-chromedriver for maximum stealth")
+                return self._setup_undetected_driver()
+            else:
+                self.logger.info("🛡️ Using enhanced regular Chrome driver")
+                return self._setup_enhanced_driver()
+                
+        except Exception as e:
+            self.logger.error(f"Failed to setup stealth driver: {e}")
+            # Fallback to basic driver
+            return self._setup_basic_driver()
+    
+    def _setup_undetected_driver(self) -> webdriver.Chrome:
+        """Setup undetected Chrome driver with maximum stealth."""
+        options = uc.ChromeOptions()
+        
+        # Core stealth options
+        stealth_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage', 
+            '--disable-gpu',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--disable-translate',
+            '--hide-scrollbars',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--no-pings',
+            '--password-store=basic',
+            '--use-mock-keychain',
+            '--disable-blink-features=AutomationControlled',
+            '--disable-dev-shm-usage',
+            '--disable-web-security',
+            '--allow-running-insecure-content'
+        ]
+        
+        for arg in stealth_args:
+            options.add_argument(arg)
+        
+        # Random user agent
+        user_agent = random.choice(self.user_agents)
+        options.add_argument(f'--user-agent={user_agent}')
+        
+        # Random window size
+        viewport_sizes = [
+            (1366, 768), (1920, 1080), (1440, 900), (1536, 864), (1280, 720)
+        ]
+        width, height = random.choice(viewport_sizes)
+        options.add_argument(f'--window-size={width},{height}')
+        
+        # Advanced prefs for stealth
+        options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        try:
+            # Use local chromedriver.exe if available
+            import os
+            local_driver_path = os.path.abspath('chromedriver.exe')
+            if os.path.exists(local_driver_path):
+                self.logger.info(f"🎯 Using local chromedriver: {local_driver_path}")
+                driver = uc.Chrome(
+                    options=options, 
+                    driver_executable_path=local_driver_path,
+                    version_main=None,
+                    use_subprocess=True
+                )
+            else:
+                self.logger.info("🥷 Using auto-downloaded undetected chromedriver")
+                driver = uc.Chrome(options=options, version_main=None)
+        except Exception as e:
+            self.logger.warning(f"Failed to create undetected driver: {e}")
+            # Fallback to regular method
+            return self._setup_enhanced_driver()
+        
+        # Advanced stealth modifications
+        self._apply_advanced_stealth(driver)
+        
+        return driver
+    
+    def _setup_enhanced_driver(self) -> webdriver.Chrome:
+        """Setup enhanced regular Chrome driver with stealth features."""
+        options = Options()
+        
+        # Core stealth options
+        stealth_args = [
+            '--no-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-features=VizDisplayCompositor',
+            '--disable-extensions',
+            '--disable-plugins',
+            '--disable-default-apps',
+            '--disable-sync',
+            '--disable-translate',
+            '--hide-scrollbars',
+            '--disable-background-timer-throttling',
+            '--disable-backgrounding-occluded-windows',
+            '--disable-renderer-backgrounding',
+            '--disable-features=TranslateUI',
+            '--disable-ipc-flooding-protection',
+            '--no-first-run',
+            '--no-default-browser-check',
+            '--no-pings',
+            '--password-store=basic',
+            '--use-mock-keychain'
+        ]
+        
+        for arg in stealth_args:
+            options.add_argument(arg)
+        
+        # Random user agent
+        user_agent = random.choice(self.user_agents)
+        options.add_argument(f'--user-agent={user_agent}')
+        
+        # Random window size
+        viewport_sizes = [
+            (1366, 768), (1920, 1080), (1440, 900), (1536, 864), (1280, 720)
+        ]
+        width, height = random.choice(viewport_sizes)
+        options.add_argument(f'--window-size={width},{height}')
+        
+        # Disable automation indicators
+        options.add_experimental_option("excludeSwitches", ["enable-automation", "enable-logging"])
+        options.add_experimental_option('useAutomationExtension', False)
+        
+        # Additional prefs
+        options.add_experimental_option("prefs", {
+            "profile.default_content_setting_values": {
+                "notifications": 2,
+                "geolocation": 2,
+                "media_stream": 2
+            },
+            "profile.managed_default_content_settings": {
+                "images": 2  # Block images for speed
+            }
+        })
+        
+        # Setup service - use local chromedriver.exe if available
+        import os
+        local_driver_path = os.path.abspath('chromedriver.exe')
+        if os.path.exists(local_driver_path):
+            self.logger.info(f"🎯 Using local chromedriver: {local_driver_path}")
+            service = Service(local_driver_path)
+        else:
+            self.logger.info("📥 Using ChromeDriverManager to download driver")
+            service = Service(ChromeDriverManager().install())
+        
+        # Create driver
+        driver = webdriver.Chrome(service=service, options=options)
+        
+        # Apply stealth modifications
+        self._apply_advanced_stealth(driver)
+        
+        return driver
+    
+    def _setup_basic_driver(self) -> webdriver.Chrome:
+        """Fallback basic driver setup."""
+        options = get_selenium_options()
+        
+        # Use local chromedriver.exe if available
+        import os
+        local_driver_path = os.path.abspath('chromedriver.exe')
+        if os.path.exists(local_driver_path):
+            self.logger.info(f"🎯 Using local chromedriver (basic mode): {local_driver_path}")
+            service = Service(local_driver_path)
+        else:
+            self.logger.info("📥 Using ChromeDriverManager (basic mode)")
             service = Service(ChromeDriverManager().install())
             
-            # Create driver
-            driver = webdriver.Chrome(service=service, options=options)
-            
-            # Execute anti-detection script
+        driver = webdriver.Chrome(service=service, options=options)
+        self._apply_basic_stealth(driver)
+        return driver
+    
+    def _apply_advanced_stealth(self, driver) -> None:
+        """Apply advanced stealth modifications to the driver."""
+        try:
+            # Remove webdriver property
             driver.execute_script("""
                 Object.defineProperty(navigator, 'webdriver', {
                     get: () => undefined,
                 });
             """)
             
-            # Modify navigator properties
+            # Randomize navigator properties
             driver.execute_cdp_cmd('Runtime.evaluate', {
                 "expression": """
+                    // Randomize navigator properties
                     Object.defineProperty(navigator, 'languages', {
-                        get: function() { return ['en-US', 'en']; }
+                        get: function() { return """ + json.dumps(['en-US', 'en']) + """; }
                     });
+                    
                     Object.defineProperty(navigator, 'plugins', {
-                        get: function() { return [1, 2, 3, 4, 5]; }
+                        get: function() { return new Array(""" + str(random.randint(3, 8)) + """).fill(0); }
+                    });
+                    
+                    Object.defineProperty(navigator, 'platform', {
+                        get: function() { return '""" + random.choice(['Win32', 'MacIntel', 'Linux x86_64']) + """;' }
+                    });
+                    
+                    Object.defineProperty(navigator, 'hardwareConcurrency', {
+                        get: function() { return """ + str(random.choice([2, 4, 8, 16])) + """; }
+                    });
+                    
+                    Object.defineProperty(navigator, 'deviceMemory', {
+                        get: function() { return """ + str(random.choice([2, 4, 8, 16])) + """; }
+                    });
+                    
+                    // Override screen properties
+                    Object.defineProperty(screen, 'colorDepth', {
+                        get: function() { return 24; }
+                    });
+                    
+                    Object.defineProperty(screen, 'pixelDepth', {
+                        get: function() { return 24; }
                     });
                 """
             })
             
-            # Set random viewport size
-            viewport_sizes = [
-                (1366, 768), (1920, 1080), (1440, 900), (1536, 864)
-            ]
-            width, height = random.choice(viewport_sizes)
-            driver.set_window_size(width, height)
+            # Set timezone
+            driver.execute_cdp_cmd('Emulation.setTimezoneOverride', {
+                'timezoneId': random.choice([
+                    'America/New_York', 'America/Los_Angeles', 'Europe/London', 
+                    'Europe/Berlin', 'Asia/Tokyo', 'Australia/Sydney'
+                ])
+            })
             
-            return driver
+            # Randomize canvas fingerprint
+            driver.execute_script("""
+                const getImageData = HTMLCanvasElement.prototype.toDataURL;
+                HTMLCanvasElement.prototype.toDataURL = function(type) {
+                    const shift = Math.floor(Math.random() * 10) - 5;
+                    const canvas = this;
+                    const ctx = canvas.getContext('2d');
+                    const originalImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    
+                    for (let i = 0; i < originalImageData.data.length; i += 4) {
+                        originalImageData.data[i] = Math.min(255, Math.max(0, originalImageData.data[i] + shift));
+                        originalImageData.data[i + 1] = Math.min(255, Math.max(0, originalImageData.data[i + 1] + shift));
+                        originalImageData.data[i + 2] = Math.min(255, Math.max(0, originalImageData.data[i + 2] + shift));
+                    }
+                    
+                    ctx.putImageData(originalImageData, 0, 0);
+                    return getImageData.apply(this, arguments);
+                };
+            """)
+            
+            self.logger.info("✅ Advanced stealth modifications applied")
             
         except Exception as e:
-            self.logger.error(f"Failed to setup Chrome driver: {e}")
-            raise
+            self.logger.warning(f"Failed to apply advanced stealth: {e}")
+            self._apply_basic_stealth(driver)
+    
+    def _apply_basic_stealth(self, driver) -> None:
+        """Apply basic stealth modifications."""
+        try:
+            # Remove webdriver property
+            driver.execute_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => undefined,
+                });
+            """)
+            
+            self.logger.info("✅ Basic stealth modifications applied")
+        except Exception as e:
+            self.logger.warning(f"Failed to apply basic stealth: {e}")
     
     def _simulate_human_behavior(self) -> None:
         """Simulate human-like behavior to avoid detection."""
@@ -226,7 +469,7 @@ class SeleniumScraper(BaseScraper):
             List of product data dictionaries
         """
         if not self.driver:
-            self.driver = self._setup_driver()
+            self.driver = self._setup_stealth_driver()
             self.wait = WebDriverWait(self.driver, 10)
         
         try:
@@ -497,4 +740,8 @@ class SeleniumScraper(BaseScraper):
     def __del__(self):
         """Ensure browser is closed when object is destroyed."""
         if hasattr(self, 'driver'):
-            self.close() 
+            self.close()
+
+
+# Backward compatibility alias
+SeleniumScraper = AdvancedSeleniumScraper 
