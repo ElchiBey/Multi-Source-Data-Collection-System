@@ -20,6 +20,28 @@ scraping:
   # Concurrent workers
   max_workers: 5
 
+# NEW: Optimized Collection Settings
+collection:
+  # Maximum parallel workers for turbo mode
+  max_workers: 8
+  
+  # Batch size for parallel processing
+  batch_size: 12
+  
+  # Domain-specific delays (seconds)
+  domain_delays:
+    amazon: 2.0
+    ebay: 1.5
+    walmart: 2.5
+  
+  # Performance optimization
+  enable_concurrent: true
+  enable_async: false
+  
+  # Resource limits
+  max_memory_mb: 2048
+  cpu_threshold: 80
+
 # Database Configuration
 database:
   # SQLite database URL
