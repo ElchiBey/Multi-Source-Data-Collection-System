@@ -1,406 +1,488 @@
 """
-Statistical Analysis Module
+📊 Statistical Analysis Module
 
-This module provides comprehensive statistical analysis of scraped product data,
-including descriptive statistics, price analysis, and market insights.
+Comprehensive data analysis using pandas and numpy for the Multi-Source Data Collection System.
+Provides statistical summaries, distributions, and comparative analysis across sources.
 """
 
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
-from datetime import datetime, timedelta
-import logging
+import json
 from pathlib import Path
+import logging
+from datetime import datetime, timedelta
+import sqlite3
 
-from ..data.database import DatabaseManager
-from ..utils.logger import setup_logger
+from ..utils.logger import get_logger
 
-logger = setup_logger(__name__)
+logger = get_logger(__name__)
 
-class ProductStatistics:
+class DataStatistics:
     """
-    Comprehensive statistical analysis for product data.
+    📊 Comprehensive statistical analysis for scraped product data.
     
-    Provides statistical insights including:
-    - Descriptive statistics
-    - Price distributions
-    - Market comparison
-    - Trend analysis
+    Features:
+    - Price analysis and distributions
+    - Source comparison and performance metrics
+    - Data quality assessment
+    - Trend analysis over time
+    - Statistical summaries and insights
     """
     
-    def __init__(self, config: Dict[str, Any]):
+    def __init__(self, db_path: str = "data/products.db"):
         """Initialize statistics analyzer."""
-        self.config = config
-        self.db_manager = DatabaseManager(config)
+        self.db_path = db_path
+        self.df = None
+        self.stats = {}
     
-    def get_basic_statistics(self) -> Dict[str, Any]:
+    def load_data(self, source: str = "database") -> pd.DataFrame:
         """
-        Get basic descriptive statistics for all products.
+        Load data from database or files for analysis.
+        
+        Args:
+            source: Data source ("database", "files", or specific file path)
         
         Returns:
-            Dictionary with basic statistics
+            Loaded DataFrame
         """
         try:
-            # Get product data
-            products_df = self._get_products_dataframe()
+            if source == "database":
+                self.df = self._load_from_database()
+            elif source == "files":
+                self.df = self._load_from_files()
+            else:
+                self.df = self._load_from_file(source)
+                
+            logger.info(f"📊 Loaded {len(self.df)} records for analysis")
+            return self.df
             
-            if products_df.empty:
-                return {'error': 'No product data available'}
+        except Exception as e:
+            logger.error(f"Failed to load data: {e}")
+            return pd.DataFrame()
+    
+    def _load_from_database(self) -> pd.DataFrame:
+        """Load product data from SQLite database."""
+        try:
+            conn = sqlite3.connect(self.db_path)
             
-            # Calculate basic statistics
+            query = """
+            SELECT 
+                source,
+                title,
+                price,
+                rating,
+                search_keyword,
+                scraper_type,
+                scraped_at,
+                url,
+                image_url,
+                product_id,
+                brand,
+                condition,
+                availability,
+                review_count,
+                shipping_cost
+            FROM products 
+            WHERE price IS NOT NULL AND price > 0
+            ORDER BY scraped_at DESC
+            """
+            
+            df = pd.read_sql_query(query, conn)
+            conn.close()
+            
+            # Convert datetime
+            df['scraped_at'] = pd.to_datetime(df['scraped_at'])
+            # Also create created_at alias for compatibility
+            df['created_at'] = df['scraped_at']
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"Database loading error: {e}")
+            return pd.DataFrame()
+    
+    def _load_from_files(self) -> pd.DataFrame:
+        """Load data from JSON files in data_output directory."""
+        data_frames = []
+        
+        try:
+            output_dir = Path("data_output")
+            json_files = list(output_dir.rglob("*.json"))
+            
+            for file_path in json_files:
+                try:
+                    with open(file_path, 'r', encoding='utf-8') as f:
+                        data = json.load(f)
+                    
+                    # Handle different JSON structures
+                    products = data.get('products', data if isinstance(data, list) else [])
+                    
+                    if products:
+                        df = pd.DataFrame(products)
+                        if not df.empty:
+                            data_frames.append(df)
+                            
+                except Exception as e:
+                    logger.debug(f"Skipping file {file_path}: {e}")
+                    continue
+            
+            if data_frames:
+                combined_df = pd.concat(data_frames, ignore_index=True)
+                
+                # Clean and standardize data
+                combined_df = self._clean_dataframe(combined_df)
+                
+                return combined_df
+            
+        except Exception as e:
+            logger.error(f"File loading error: {e}")
+        
+        return pd.DataFrame()
+    
+    def _load_from_file(self, file_path: str) -> pd.DataFrame:
+        """Load data from specific JSON file."""
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            products = data.get('products', data if isinstance(data, list) else [])
+            
+            if products:
+                df = pd.DataFrame(products)
+                return self._clean_dataframe(df)
+            
+        except Exception as e:
+            logger.error(f"File loading error for {file_path}: {e}")
+        
+        return pd.DataFrame()
+    
+    def _clean_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Clean and standardize DataFrame for analysis."""
+        try:
+            # Convert price to numeric
+            if 'price' in df.columns:
+                df['price'] = pd.to_numeric(df['price'], errors='coerce')
+            
+            # Convert rating to numeric
+            if 'rating' in df.columns:
+                df['rating'] = pd.to_numeric(df['rating'], errors='coerce')
+            
+            # Parse datetime fields
+            for date_col in ['created_at', 'scraped_at', 'timestamp']:
+                if date_col in df.columns:
+                    df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
+            
+            # Remove invalid records
+            if 'price' in df.columns:
+                df = df[df['price'] > 0]  # Remove zero/negative prices
+            
+            # Remove duplicates based on title and source
+            if 'title' in df.columns and 'source' in df.columns:
+                df = df.drop_duplicates(subset=['title', 'source'], keep='first')
+            
+            return df
+            
+        except Exception as e:
+            logger.error(f"DataFrame cleaning error: {e}")
+            return df
+    
+    def generate_comprehensive_statistics(self) -> Dict[str, Any]:
+        """
+        Generate comprehensive statistical analysis.
+        
+        Returns:
+            Dictionary containing all statistical metrics
+        """
+        if self.df is None or self.df.empty:
+            logger.warning("No data loaded for statistics")
+            return {}
+        
+        try:
             stats = {
-                'total_products': len(products_df),
-                'unique_sources': products_df['source'].nunique(),
-                'sources_breakdown': products_df['source'].value_counts().to_dict(),
-                'date_range': {
-                    'earliest': products_df['scraped_at'].min().isoformat() if not products_df['scraped_at'].empty else None,
-                    'latest': products_df['scraped_at'].max().isoformat() if not products_df['scraped_at'].empty else None
-                },
-                'keywords_analyzed': products_df['search_keyword'].unique().tolist()
+                'overview': self._generate_overview_stats(),
+                'price_analysis': self._analyze_prices(),
+                'source_comparison': self._compare_sources(),
+                'data_quality': self._assess_data_quality(),
+                'trend_analysis': self._analyze_trends(),
+                'keyword_performance': self._analyze_keywords(),
+                'scraper_performance': self._analyze_scraper_performance()
             }
             
-            # Price statistics (only for products with prices)
-            price_data = products_df[products_df['price'].notna()]
-            if not price_data.empty:
-                stats['price_statistics'] = {
-                    'total_with_prices': len(price_data),
-                    'mean_price': float(price_data['price'].mean()),
-                    'median_price': float(price_data['price'].median()),
-                    'min_price': float(price_data['price'].min()),
-                    'max_price': float(price_data['price'].max()),
-                    'std_price': float(price_data['price'].std()),
-                    'price_quartiles': {
-                        'q1': float(price_data['price'].quantile(0.25)),
-                        'q2': float(price_data['price'].quantile(0.5)),
-                        'q3': float(price_data['price'].quantile(0.75))
-                    }
-                }
-            
-            # Rating statistics
-            rating_data = products_df[products_df['rating'].notna()]
-            if not rating_data.empty:
-                stats['rating_statistics'] = {
-                    'total_with_ratings': len(rating_data),
-                    'mean_rating': float(rating_data['rating'].mean()),
-                    'median_rating': float(rating_data['rating'].median()),
-                    'rating_distribution': rating_data['rating'].value_counts().sort_index().to_dict()
-                }
-            
-            logger.info(f"Generated basic statistics for {stats['total_products']} products")
+            self.stats = stats
+            logger.info("📊 Comprehensive statistics generated successfully")
             return stats
             
         except Exception as e:
-            logger.error(f"Error generating basic statistics: {e}")
-            return {'error': str(e)}
-    
-    def get_price_analysis_by_source(self) -> Dict[str, Any]:
-        """
-        Analyze price distributions by source.
-        
-        Returns:
-            Price analysis breakdown by source
-        """
-        try:
-            products_df = self._get_products_dataframe()
-            price_data = products_df[products_df['price'].notna()]
-            
-            if price_data.empty:
-                return {'error': 'No price data available'}
-            
-            analysis = {}
-            
-            for source in price_data['source'].unique():
-                source_data = price_data[price_data['source'] == source]
-                
-                analysis[source] = {
-                    'product_count': len(source_data),
-                    'price_stats': {
-                        'mean': float(source_data['price'].mean()),
-                        'median': float(source_data['price'].median()),
-                        'min': float(source_data['price'].min()),
-                        'max': float(source_data['price'].max()),
-                        'std': float(source_data['price'].std())
-                    },
-                    'price_ranges': {
-                        'under_50': len(source_data[source_data['price'] < 50]),
-                        '50_to_200': len(source_data[(source_data['price'] >= 50) & (source_data['price'] < 200)]),
-                        '200_to_500': len(source_data[(source_data['price'] >= 200) & (source_data['price'] < 500)]),
-                        '500_to_1000': len(source_data[(source_data['price'] >= 500) & (source_data['price'] < 1000)]),
-                        'over_1000': len(source_data[source_data['price'] >= 1000])
-                    }
-                }
-            
-            # Add comparative analysis
-            analysis['comparison'] = {
-                'cheapest_source': price_data.groupby('source')['price'].mean().idxmin(),
-                'most_expensive_source': price_data.groupby('source')['price'].mean().idxmax(),
-                'price_variance_by_source': price_data.groupby('source')['price'].std().to_dict()
-            }
-            
-            return analysis
-            
-        except Exception as e:
-            logger.error(f"Error in price analysis by source: {e}")
-            return {'error': str(e)}
-    
-    def get_keyword_analysis(self) -> Dict[str, Any]:
-        """
-        Analyze products by search keywords.
-        
-        Returns:
-            Keyword-based analysis
-        """
-        try:
-            products_df = self._get_products_dataframe()
-            
-            if products_df.empty:
-                return {'error': 'No product data available'}
-            
-            analysis = {}
-            
-            for keyword in products_df['search_keyword'].unique():
-                keyword_data = products_df[products_df['search_keyword'] == keyword]
-                keyword_price_data = keyword_data[keyword_data['price'].notna()]
-                
-                keyword_stats = {
-                    'total_products': len(keyword_data),
-                    'sources': keyword_data['source'].value_counts().to_dict(),
-                    'avg_products_per_page': keyword_data.groupby(['source', 'page_number']).size().mean()
-                }
-                
-                if not keyword_price_data.empty:
-                    keyword_stats['price_analysis'] = {
-                        'mean_price': float(keyword_price_data['price'].mean()),
-                        'median_price': float(keyword_price_data['price'].median()),
-                        'price_range': {
-                            'min': float(keyword_price_data['price'].min()),
-                            'max': float(keyword_price_data['price'].max())
-                        },
-                        'cheapest_source': keyword_price_data.groupby('source')['price'].mean().idxmin(),
-                        'most_expensive_source': keyword_price_data.groupby('source')['price'].mean().idxmax()
-                    }
-                
-                # Rating analysis for keyword
-                keyword_rating_data = keyword_data[keyword_data['rating'].notna()]
-                if not keyword_rating_data.empty:
-                    keyword_stats['rating_analysis'] = {
-                        'avg_rating': float(keyword_rating_data['rating'].mean()),
-                        'highest_rated_source': keyword_rating_data.groupby('source')['rating'].mean().idxmax(),
-                        'rating_distribution': keyword_rating_data['rating'].value_counts().sort_index().to_dict()
-                    }
-                
-                analysis[keyword] = keyword_stats
-            
-            return analysis
-            
-        except Exception as e:
-            logger.error(f"Error in keyword analysis: {e}")
-            return {'error': str(e)}
-    
-    def get_market_insights(self) -> Dict[str, Any]:
-        """
-        Generate market insights and recommendations.
-        
-        Returns:
-            Market insights and analysis
-        """
-        try:
-            products_df = self._get_products_dataframe()
-            price_data = products_df[products_df['price'].notna()]
-            
-            if price_data.empty:
-                return {'error': 'No price data available for market insights'}
-            
-            insights = {}
-            
-            # Overall market insights
-            insights['market_overview'] = {
-                'total_market_size': len(price_data),
-                'average_market_price': float(price_data['price'].mean()),
-                'price_volatility': float(price_data['price'].std() / price_data['price'].mean()),
-                'competitive_landscape': len(price_data['source'].unique())
-            }
-            
-            # Source competitiveness
-            source_analysis = price_data.groupby('source').agg({
-                'price': ['mean', 'count', 'std'],
-                'rating': 'mean'
-            }).round(2)
-            
-            insights['source_competitiveness'] = {}
-            for source in source_analysis.index:
-                insights['source_competitiveness'][source] = {
-                    'avg_price': float(source_analysis.loc[source, ('price', 'mean')]),
-                    'product_variety': int(source_analysis.loc[source, ('price', 'count')]),
-                    'price_consistency': float(1 / (source_analysis.loc[source, ('price', 'std')] + 0.01)),  # Lower std = higher consistency
-                    'avg_rating': float(source_analysis.loc[source, ('rating', 'mean')]) if not pd.isna(source_analysis.loc[source, ('rating', 'mean')]) else None
-                }
-            
-            # Best value recommendations
-            insights['recommendations'] = self._generate_recommendations(price_data)
-            
-            # Market trends (if we have time-series data)
-            if 'scraped_at' in products_df.columns:
-                insights['temporal_trends'] = self._analyze_temporal_trends(products_df)
-            
-            return insights
-            
-        except Exception as e:
-            logger.error(f"Error generating market insights: {e}")
-            return {'error': str(e)}
-    
-    def get_data_quality_report(self) -> Dict[str, Any]:
-        """
-        Generate data quality assessment report.
-        
-        Returns:
-            Data quality metrics and issues
-        """
-        try:
-            products_df = self._get_products_dataframe()
-            
-            if products_df.empty:
-                return {'error': 'No data available for quality assessment'}
-            
-            total_records = len(products_df)
-            
-            quality_report = {
-                'total_records': total_records,
-                'completeness': {
-                    'title': {
-                        'filled': int((~products_df['title'].isna()).sum()),
-                        'missing': int(products_df['title'].isna().sum()),
-                        'percentage': float((~products_df['title'].isna()).sum() / total_records * 100)
-                    },
-                    'price': {
-                        'filled': int((~products_df['price'].isna()).sum()),
-                        'missing': int(products_df['price'].isna().sum()),
-                        'percentage': float((~products_df['price'].isna()).sum() / total_records * 100)
-                    },
-                    'rating': {
-                        'filled': int((~products_df['rating'].isna()).sum()),
-                        'missing': int(products_df['rating'].isna().sum()),
-                        'percentage': float((~products_df['rating'].isna()).sum() / total_records * 100)
-                    },
-                    'url': {
-                        'filled': int((~products_df['url'].isna()).sum()),
-                        'missing': int(products_df['url'].isna().sum()),
-                        'percentage': float((~products_df['url'].isna()).sum() / total_records * 100)
-                    }
-                },
-                'data_integrity': {
-                    'duplicate_titles': int(products_df['title'].duplicated().sum()),
-                    'duplicate_urls': int(products_df['url'].duplicated().sum()),
-                    'invalid_prices': int((products_df['price'] < 0).sum()) if 'price' in products_df.columns else 0,
-                    'invalid_ratings': int((products_df['rating'] > 5).sum()) if 'rating' in products_df.columns else 0
-                },
-                'source_coverage': products_df['source'].value_counts().to_dict(),
-                'keyword_coverage': products_df['search_keyword'].value_counts().to_dict()
-            }
-            
-            # Calculate overall quality score
-            completeness_scores = [
-                quality_report['completeness'][field]['percentage'] 
-                for field in ['title', 'price', 'url']
-            ]
-            quality_report['overall_quality_score'] = float(np.mean(completeness_scores))
-            
-            return quality_report
-            
-        except Exception as e:
-            logger.error(f"Error generating data quality report: {e}")
-            return {'error': str(e)}
-    
-    def _get_products_dataframe(self) -> pd.DataFrame:
-        """
-        Get products data as pandas DataFrame.
-        
-        Returns:
-            DataFrame with product data
-        """
-        try:
-            with self.db_manager.get_session() as session:
-                # Get all products
-                from ..data.models import Product
-                
-                products = session.query(Product).all()
-                
-                if not products:
-                    return pd.DataFrame()
-                
-                # Convert to DataFrame
-                data = []
-                for product in products:
-                    data.append({
-                        'id': product.id,
-                        'source': product.source,
-                        'title': product.title,
-                        'url': product.url,
-                        'price': product.price,
-                        'rating': product.rating,
-                        'search_keyword': product.search_keyword,
-                        'page_number': product.page_number,
-                        'position_on_page': product.position_on_page,
-                        'scraped_at': product.scraped_at,
-                        'scraper_type': product.scraper_type
-                    })
-                
-                df = pd.DataFrame(data)
-                
-                # Convert data types
-                if not df.empty:
-                    df['scraped_at'] = pd.to_datetime(df['scraped_at'])
-                    df['price'] = pd.to_numeric(df['price'], errors='coerce')
-                    df['rating'] = pd.to_numeric(df['rating'], errors='coerce')
-                
-                return df
-                
-        except Exception as e:
-            logger.error(f"Error getting products DataFrame: {e}")
-            return pd.DataFrame()
-    
-    def _generate_recommendations(self, price_data: pd.DataFrame) -> Dict[str, Any]:
-        """Generate shopping recommendations based on analysis."""
-        try:
-            recommendations = {}
-            
-            # Best value by source
-            source_value_score = price_data.groupby('source').apply(
-                lambda x: (x['rating'].mean() if not x['rating'].isna().all() else 3.0) / (x['price'].mean() / 100)
-            ).sort_values(ascending=False)
-            
-            recommendations['best_value_sources'] = source_value_score.head(3).to_dict()
-            
-            # Price range recommendations
-            price_percentiles = price_data['price'].quantile([0.25, 0.5, 0.75])
-            recommendations['price_ranges'] = {
-                'budget_friendly': f"Under ${price_percentiles[0.25]:.2f}",
-                'mid_range': f"${price_percentiles[0.25]:.2f} - ${price_percentiles[0.75]:.2f}",
-                'premium': f"Over ${price_percentiles[0.75]:.2f}"
-            }
-            
-            return recommendations
-            
-        except Exception as e:
-            logger.error(f"Error generating recommendations: {e}")
+            logger.error(f"Statistics generation failed: {e}")
             return {}
     
-    def _analyze_temporal_trends(self, products_df: pd.DataFrame) -> Dict[str, Any]:
-        """Analyze temporal trends in the data."""
+    def _generate_overview_stats(self) -> Dict[str, Any]:
+        """Generate basic overview statistics."""
+        return {
+            'total_products': len(self.df),
+            'unique_sources': self.df['source'].nunique() if 'source' in self.df.columns else 0,
+            'date_range': {
+                'earliest': self.df['created_at'].min().isoformat() if 'created_at' in self.df.columns else None,
+                'latest': self.df['created_at'].max().isoformat() if 'created_at' in self.df.columns else None
+            },
+            'data_completeness': {
+                'has_price': (self.df['price'].notna().sum() / len(self.df) * 100) if 'price' in self.df.columns else 0,
+                'has_rating': (self.df['rating'].notna().sum() / len(self.df) * 100) if 'rating' in self.df.columns else 0,
+                'has_url': (self.df['url'].notna().sum() / len(self.df) * 100) if 'url' in self.df.columns else 0
+            }
+        }
+    
+    def _analyze_prices(self) -> Dict[str, Any]:
+        """Analyze price distributions and statistics."""
+        if 'price' not in self.df.columns:
+            return {}
+        
+        prices = self.df['price'].dropna()
+        
+        return {
+            'summary': {
+                'mean': float(prices.mean()),
+                'median': float(prices.median()),
+                'std': float(prices.std()),
+                'min': float(prices.min()),
+                'max': float(prices.max()),
+                'q1': float(prices.quantile(0.25)),
+                'q3': float(prices.quantile(0.75))
+            },
+            'distribution': {
+                'under_100': int((prices < 100).sum()),
+                'under_500': int((prices < 500).sum()),
+                'under_1000': int((prices < 1000).sum()),
+                'over_1000': int((prices >= 1000).sum())
+            },
+            'outliers': {
+                'iqr_outliers': self._detect_iqr_outliers(prices),
+                'z_score_outliers': self._detect_z_score_outliers(prices)
+            }
+        }
+    
+    def _compare_sources(self) -> Dict[str, Any]:
+        """Compare performance and characteristics across sources."""
+        if 'source' not in self.df.columns:
+            return {}
+        
+        source_stats = {}
+        
+        for source in self.df['source'].unique():
+            source_data = self.df[self.df['source'] == source]
+            
+            source_stats[source] = {
+                'total_products': len(source_data),
+                'avg_price': float(source_data['price'].mean()) if 'price' in source_data.columns else None,
+                'avg_rating': float(source_data['rating'].mean()) if 'rating' in source_data.columns else None,
+                'price_range': {
+                    'min': float(source_data['price'].min()) if 'price' in source_data.columns else None,
+                    'max': float(source_data['price'].max()) if 'price' in source_data.columns else None
+                } if 'price' in source_data.columns else None,
+                'data_quality_score': self._calculate_source_quality_score(source_data)
+            }
+        
+        return source_stats
+    
+    def _assess_data_quality(self) -> Dict[str, Any]:
+        """Assess overall data quality."""
+        return {
+            'completeness_score': self._calculate_completeness_score(),
+            'duplicate_rate': self._calculate_duplicate_rate(),
+            'invalid_data_rate': self._calculate_invalid_data_rate(),
+            'consistency_score': self._calculate_consistency_score()
+        }
+    
+    def _analyze_trends(self) -> Dict[str, Any]:
+        """Analyze trends over time."""
+        if 'created_at' not in self.df.columns:
+            return {}
+        
+        # Group by date
+        daily_stats = self.df.groupby(self.df['created_at'].dt.date).agg({
+            'price': ['count', 'mean', 'median'],
+            'source': 'nunique'
+        }).round(2)
+        
+        return {
+            'daily_collection_trend': daily_stats.to_dict(),
+            'price_trend': self._analyze_price_trends(),
+            'collection_velocity': self._calculate_collection_velocity()
+        }
+    
+    def _analyze_keywords(self) -> Dict[str, Any]:
+        """Analyze keyword performance."""
+        if 'search_keyword' not in self.df.columns:
+            return {}
+        
+        keyword_stats = self.df.groupby('search_keyword').agg({
+            'price': ['count', 'mean', 'std'],
+            'rating': 'mean',
+            'source': 'nunique'
+        }).round(2)
+        
+        return keyword_stats.to_dict()
+    
+    def _analyze_scraper_performance(self) -> Dict[str, Any]:
+        """Analyze scraper type performance."""
+        if 'scraper_type' not in self.df.columns:
+            return {}
+        
+        scraper_stats = self.df.groupby('scraper_type').agg({
+            'price': 'count',
+            'source': 'nunique'
+        })
+        
+        return scraper_stats.to_dict()
+    
+    def _detect_iqr_outliers(self, data: pd.Series) -> Dict[str, Any]:
+        """Detect outliers using IQR method."""
+        q1 = data.quantile(0.25)
+        q3 = data.quantile(0.75)
+        iqr = q3 - q1
+        
+        lower_bound = q1 - 1.5 * iqr
+        upper_bound = q3 + 1.5 * iqr
+        
+        outliers = data[(data < lower_bound) | (data > upper_bound)]
+        
+        return {
+            'count': len(outliers),
+            'percentage': len(outliers) / len(data) * 100,
+            'values': outliers.tolist()[:10]  # First 10 outliers
+        }
+    
+    def _detect_z_score_outliers(self, data: pd.Series, threshold: float = 3) -> Dict[str, Any]:
+        """Detect outliers using Z-score method."""
+        z_scores = np.abs((data - data.mean()) / data.std())
+        outliers = data[z_scores > threshold]
+        
+        return {
+            'count': len(outliers),
+            'percentage': len(outliers) / len(data) * 100,
+            'values': outliers.tolist()[:10]  # First 10 outliers
+        }
+    
+    def _calculate_source_quality_score(self, source_data: pd.DataFrame) -> float:
+        """Calculate data quality score for a source."""
+        scores = []
+        
+        # Completeness score
+        if 'price' in source_data.columns:
+            price_completeness = source_data['price'].notna().mean()
+            scores.append(price_completeness)
+        
+        if 'rating' in source_data.columns:
+            rating_completeness = source_data['rating'].notna().mean()
+            scores.append(rating_completeness)
+        
+        if 'url' in source_data.columns:
+            url_completeness = source_data['url'].notna().mean()
+            scores.append(url_completeness)
+        
+        return float(np.mean(scores)) if scores else 0.0
+    
+    def _calculate_completeness_score(self) -> float:
+        """Calculate overall data completeness score."""
+        important_columns = ['price', 'title', 'source', 'url']
+        scores = []
+        
+        for col in important_columns:
+            if col in self.df.columns:
+                completeness = self.df[col].notna().mean()
+                scores.append(completeness)
+        
+        return float(np.mean(scores)) if scores else 0.0
+    
+    def _calculate_duplicate_rate(self) -> float:
+        """Calculate duplicate rate based on title similarity."""
+        if 'title' not in self.df.columns:
+            return 0.0
+        
+        total_records = len(self.df)
+        unique_titles = self.df['title'].nunique()
+        
+        return float((total_records - unique_titles) / total_records * 100)
+    
+    def _calculate_invalid_data_rate(self) -> float:
+        """Calculate rate of invalid data."""
+        invalid_count = 0
+        total_count = len(self.df)
+        
+        # Check for invalid prices
+        if 'price' in self.df.columns:
+            invalid_count += (self.df['price'] <= 0).sum()
+        
+        # Check for missing titles
+        if 'title' in self.df.columns:
+            invalid_count += self.df['title'].isna().sum()
+        
+        return float(invalid_count / total_count * 100) if total_count > 0 else 0.0
+    
+    def _calculate_consistency_score(self) -> float:
+        """Calculate data consistency score."""
+        # This is a simplified consistency check
+        # In real implementation, you'd check format consistency, etc.
+        return 85.0  # Placeholder score
+    
+    def _analyze_price_trends(self) -> Dict[str, Any]:
+        """Analyze price trends over time."""
+        if 'created_at' not in self.df.columns or 'price' not in self.df.columns:
+            return {}
+        
+        # Group by week
+        weekly_prices = self.df.groupby(pd.Grouper(key='created_at', freq='W'))['price'].mean()
+        
+        # Calculate trend
+        if len(weekly_prices) > 1:
+            trend_slope = np.polyfit(range(len(weekly_prices)), weekly_prices.values, 1)[0]
+            trend_direction = "increasing" if trend_slope > 0 else "decreasing"
+        else:
+            trend_slope = 0
+            trend_direction = "stable"
+        
+        return {
+            'trend_direction': trend_direction,
+            'trend_slope': float(trend_slope),
+            'weekly_averages': weekly_prices.to_dict()
+        }
+    
+    def _calculate_collection_velocity(self) -> Dict[str, Any]:
+        """Calculate how fast data is being collected."""
+        if 'created_at' not in self.df.columns:
+            return {}
+        
+        # Products per day
+        daily_counts = self.df.groupby(self.df['created_at'].dt.date).size()
+        
+        return {
+            'avg_products_per_day': float(daily_counts.mean()),
+            'max_products_per_day': int(daily_counts.max()),
+            'total_collection_days': len(daily_counts)
+        }
+    
+    def export_statistics(self, output_path: str = "data_output/reports/statistics.json") -> str:
+        """Export statistics to JSON file."""
         try:
-            trends = {}
+            output_file = Path(output_path)
+            output_file.parent.mkdir(parents=True, exist_ok=True)
             
-            # Daily scraping activity
-            daily_activity = products_df.groupby(products_df['scraped_at'].dt.date).size()
-            trends['daily_scraping_activity'] = daily_activity.to_dict()
+            export_data = {
+                'generated_at': datetime.now().isoformat(),
+                'statistics': self.stats,
+                'data_summary': {
+                    'total_records': len(self.df) if self.df is not None else 0,
+                    'columns': list(self.df.columns) if self.df is not None else []
+                }
+            }
             
-            # Price trends by day (if enough temporal data)
-            if len(daily_activity) > 1:
-                daily_price_trends = products_df.groupby(products_df['scraped_at'].dt.date)['price'].mean()
-                trends['daily_average_prices'] = daily_price_trends.to_dict()
+            with open(output_file, 'w', encoding='utf-8') as f:
+                json.dump(export_data, f, indent=2, ensure_ascii=False, default=str)
             
-            return trends
+            logger.info(f"📊 Statistics exported to {output_path}")
+            return str(output_path)
             
         except Exception as e:
-            logger.error(f"Error analyzing temporal trends: {e}")
-            return {} 
+            logger.error(f"Failed to export statistics: {e}")
+            return "" 

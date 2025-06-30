@@ -248,8 +248,8 @@ class FinalValidator:
             report_generator = ReportGenerator(self.config)
             
             # Test statistics module
-            from src.analysis.statistics import ProductStatistics
-            stats = ProductStatistics(self.config)
+            from src.analysis.statistics import DataStatistics
+            stats = DataStatistics()
             
             # Test basic statistics (should work even with empty database)
             basic_stats = stats.get_basic_statistics()

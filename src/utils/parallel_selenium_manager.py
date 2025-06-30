@@ -124,6 +124,9 @@ class ParallelSeleniumManager:
         # Generate final report
         execution_time = time.time() - self.stats['start_time']
         
+        # Save results to files by source
+        saved_files = self._save_results_to_files(results)
+        
         return {
             'success': True,
             'execution_time': execution_time,
@@ -133,7 +136,8 @@ class ParallelSeleniumManager:
             'products_per_second': self.stats['total_products'] / execution_time if execution_time > 0 else 0,
             'results': results,
             'browsers_used': len(self.active_browsers),
-            'target_achieved': self.stats['total_products'] >= target_products
+            'target_achieved': self.stats['total_products'] >= target_products,
+            'saved_files': saved_files
         }
     
     def _generate_tasks(
@@ -425,4 +429,80 @@ class ParallelSeleniumManager:
         logger.info("🛑 Shutting down parallel Selenium manager...")
         self.shutdown_event.set()
         self._cleanup_browsers()
-        logger.info("✅ Parallel manager shutdown completed") 
+        logger.info("✅ Parallel manager shutdown completed")
+    
+    def _save_results_to_files(self, results: List[ParallelResult]) -> Dict[str, str]:
+        """Save scraping results to JSON files by source."""
+        saved_files = {}
+        
+        try:
+            # Group results by source
+            source_data = {}
+            for result in results:
+                if result.success and result.data:
+                    source = result.task.source
+                    if source not in source_data:
+                        source_data[source] = []
+                    source_data[source].extend(result.data)
+            
+            # Create output directory
+            output_dir = Path("data_output/selenium_parallel")
+            output_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Save each source to separate file
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            
+            for source, products in source_data.items():
+                if products:  # Only save if we have data
+                    filename = f"{source}_selenium_parallel_{timestamp}.json"
+                    filepath = output_dir / filename
+                    
+                    # Add metadata
+                    output_data = {
+                        'metadata': {
+                            'source': source,
+                            'scraper_type': 'selenium_parallel',
+                            'timestamp': timestamp,
+                            'total_products': len(products),
+                            'extraction_method': 'parallel_browsers'
+                        },
+                        'products': products
+                    }
+                    
+                    # Save to file
+                    with open(filepath, 'w', encoding='utf-8') as f:
+                        json.dump(output_data, f, indent=2, ensure_ascii=False, default=str)
+                    
+                    saved_files[source] = str(filepath)
+                    logger.info(f"💾 Saved {len(products)} {source} products to {filename}")
+            
+            # Save combined file
+            if source_data:
+                all_products = []
+                for products in source_data.values():
+                    all_products.extend(products)
+                
+                combined_filename = f"combined_selenium_parallel_{timestamp}.json"
+                combined_filepath = output_dir / combined_filename
+                
+                combined_data = {
+                    'metadata': {
+                        'scraper_type': 'selenium_parallel',
+                        'timestamp': timestamp,
+                        'total_products': len(all_products),
+                        'sources': list(source_data.keys()),
+                        'extraction_method': 'parallel_browsers'
+                    },
+                    'products': all_products
+                }
+                
+                with open(combined_filepath, 'w', encoding='utf-8') as f:
+                    json.dump(combined_data, f, indent=2, ensure_ascii=False, default=str)
+                
+                saved_files['combined'] = str(combined_filepath)
+                logger.info(f"💾 Saved {len(all_products)} combined products to {combined_filename}")
+        
+        except Exception as e:
+            logger.error(f"Failed to save results to files: {e}")
+        
+        return saved_files 

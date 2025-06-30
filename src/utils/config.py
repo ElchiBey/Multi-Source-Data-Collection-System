@@ -110,11 +110,20 @@ def get_source_config(source_name: str) -> Dict[str, Any]:
     Raises:
         KeyError: If source not configured
     """
-    sources = get_config('sources')
-    if source_name not in sources:
-        raise KeyError(f"Source '{source_name}' not configured")
-    
-    return sources[source_name]
+    # Load from scrapers.yaml file
+    try:
+        scrapers_config = load_config('config/scrapers.yaml')
+        if source_name not in scrapers_config:
+            raise KeyError(f"Source '{source_name}' not configured in scrapers.yaml")
+        
+        return scrapers_config[source_name]
+    except FileNotFoundError:
+        # Fallback to main config if scrapers.yaml doesn't exist
+        sources = get_config('sources')
+        if source_name not in sources:
+            raise KeyError(f"Source '{source_name}' not configured")
+        
+        return sources[source_name]
 
 def _validate_config(config: Dict[str, Any]) -> None:
     """
@@ -126,6 +135,13 @@ def _validate_config(config: Dict[str, Any]) -> None:
     Raises:
         ValueError: If required sections are missing
     """
+    # Check if this is scrapers.yaml (has amazon, ebay, walmart keys)
+    if any(key in config for key in ['amazon', 'ebay', 'walmart']):
+        # This is scrapers.yaml, different validation
+        logger.debug("Validating scrapers configuration")
+        return
+    
+    # Main settings.yaml validation
     required_sections = [
         'scraping',
         'database', 

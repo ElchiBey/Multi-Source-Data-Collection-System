@@ -21,6 +21,7 @@ from selenium.common.exceptions import (
     ElementClickInterceptedException, StaleElementReferenceException
 )
 from webdriver_manager.chrome import ChromeDriverManager
+from datetime import datetime
 
 # Try to import undetected-chromedriver for advanced stealth
 try:
@@ -572,81 +573,171 @@ class AdvancedSeleniumScraper(BaseScraper):
             self.logger.debug(f"Error during scrolling: {e}")
     
     def _extract_amazon_products_selenium(self, keyword: str, page: int) -> List[Dict[str, Any]]:
-        """Extract Amazon products using Selenium."""
+        """Extract Amazon products using Selenium with robust selectors."""
         products = []
         
         try:
-            # Wait for product containers to load
-            container_selector = self.selectors.get('product_container', '[data-component-type="s-search-result"]')
-            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, container_selector)))
+            # Multiple possible selectors for Amazon product containers
+            container_selectors = [
+                '[data-component-type="s-search-result"]',
+                '.s-result-item',
+                '[data-asin]:not([data-asin=""])',
+                '.sg-col-inner'
+            ]
             
-            # Find all product containers
-            containers = self.driver.find_elements(By.CSS_SELECTOR, container_selector)
-            self.logger.info(f"Found {len(containers)} product containers")
-            
-            for i, container in enumerate(containers, 1):
+            containers = []
+            for selector in container_selectors:
                 try:
-                    product = self._extract_amazon_product_selenium(container, keyword, page, i)
-                    if product:
-                        products.append(product)
-                except StaleElementReferenceException:
-                    self.logger.debug(f"Stale element reference for product {i}")
+                    # Wait for containers to appear
+                    self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                    containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if containers:
+                        self.logger.info(f"Found {len(containers)} products using selector: {selector}")
+                        break
+                except TimeoutException:
                     continue
+            
+            if not containers:
+                # Debug: Save page source to see what's actually there
+                self.logger.warning("No product containers found. Checking page content...")
+                page_text = self.driver.page_source[:1000]  # First 1000 chars
+                self.logger.debug(f"Page content preview: {page_text}")
+                
+                # Try finding ANY products with very broad selectors
+                broad_selectors = [
+                    '[data-asin]',
+                    '.s-item',
+                    '.product',
+                    '[data-component-type]'
+                ]
+                
+                for selector in broad_selectors:
+                    containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if containers:
+                        self.logger.info(f"Found {len(containers)} elements with broad selector: {selector}")
+                        break
+            
+            # Extract data from containers
+            for i, container in enumerate(containers[:20], 1):  # Limit to 20 products
+                try:
+                    product = self._extract_amazon_product_robust(container, keyword, page, i)
+                    if product and product.get('title'):
+                        products.append(product)
+                        self.logger.debug(f"Extracted product {i}: {product.get('title', 'No title')[:50]}...")
                 except Exception as e:
                     self.logger.debug(f"Failed to extract Amazon product {i}: {e}")
                     continue
             
-        except TimeoutException:
-            self.logger.warning("No Amazon products found - page may not have loaded properly")
+            self.logger.info(f"Successfully extracted {len(products)} Amazon products")
+            
         except Exception as e:
             self.logger.error(f"Error extracting Amazon products: {e}")
         
         return products
     
-    def _extract_amazon_product_selenium(self, container, keyword: str, page: int, position: int) -> Optional[Dict[str, Any]]:
-        """Extract single Amazon product using Selenium."""
+    def _extract_amazon_product_robust(self, container, keyword: str, page: int, position: int) -> Optional[Dict[str, Any]]:
+        """Extract single Amazon product with multiple fallback selectors."""
         try:
-            # Extract title
-            title_selector = self.selectors.get('title', 'h2 a span')
-            title_element = container.find_element(By.CSS_SELECTOR, title_selector)
-            title = clean_text(title_element.text) if title_element else None
+            # Multiple title selectors to try
+            title_selectors = [
+                'h2 a span',
+                '.s-title-instructions-style span',
+                'h2 span',
+                '.s-color-base',
+                'a[title]',
+                '.a-link-normal span'
+            ]
+            
+            title = None
+            title_element = None
+            for selector in title_selectors:
+                try:
+                    title_element = container.find_element(By.CSS_SELECTOR, selector)
+                    title = clean_text(title_element.text) if title_element else None
+                    if title and len(title) > 10:  # Valid title should be reasonably long
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # Try getting title from title attribute if text didn't work
+            if not title and title_element:
+                title = title_element.get_attribute('title')
+            
+            if not title:
+                # Final fallback - get any text from the container
+                all_text = container.text.strip()
+                if all_text:
+                    lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+                    # Usually the first substantial line is the title
+                    for line in lines:
+                        if len(line) > 15 and not line.startswith('$') and 'rating' not in line.lower():
+                            title = line
+                            break
             
             if not title:
                 return None
             
-            # Extract link
-            link_selector = self.selectors.get('link', 'h2 a')
-            link_element = container.find_element(By.CSS_SELECTOR, link_selector)
-            relative_url = link_element.get_attribute('href') if link_element else None
-            url = normalize_url(relative_url, self.source_config.get('base_url', '')) if relative_url else None
+            # Extract URL with multiple selectors
+            url_selectors = ['h2 a', 'a[title]', 'a']
+            url = None
+            for selector in url_selectors:
+                try:
+                    link_element = container.find_element(By.CSS_SELECTOR, selector)
+                    relative_url = link_element.get_attribute('href')
+                    if relative_url and '/dp/' in relative_url:
+                        url = normalize_url(relative_url, 'https://www.amazon.com')
+                        break
+                except NoSuchElementException:
+                    continue
             
-            # Extract price
-            price_selector = self.selectors.get('price', '.a-price .a-offscreen')
-            try:
-                price_element = container.find_element(By.CSS_SELECTOR, price_selector)
-                price_text = price_element.text if price_element else None
-                price = extract_price(price_text) if price_text else None
-            except NoSuchElementException:
-                price = None
+            # Extract price with multiple selectors
+            price_selectors = [
+                '.a-price .a-offscreen',
+                '.a-price-whole',
+                '.a-price',
+                '[data-a-price]',
+                '.s-price'
+            ]
+            
+            price = None
+            for selector in price_selectors:
+                try:
+                    price_element = container.find_element(By.CSS_SELECTOR, selector)
+                    price_text = price_element.text or price_element.get_attribute('data-a-price')
+                    if price_text and '$' in price_text:
+                        price = extract_price(price_text)
+                        if price:
+                            break
+                except NoSuchElementException:
+                    continue
             
             # Extract rating
-            rating_selector = self.selectors.get('rating', '.a-icon-alt')
-            try:
-                rating_element = container.find_element(By.CSS_SELECTOR, rating_selector)
-                rating_text = rating_element.get_attribute('alt') if rating_element else ''
-                rating = extract_rating(rating_text) if rating_text else None
-            except NoSuchElementException:
-                rating = None
+            rating_selectors = ['.a-icon-alt', '.a-icon', '[aria-label*="stars"]']
+            rating = None
+            for selector in rating_selectors:
+                try:
+                    rating_element = container.find_element(By.CSS_SELECTOR, selector)
+                    rating_text = rating_element.get_attribute('aria-label') or rating_element.text
+                    if rating_text:
+                        rating = extract_rating(rating_text)
+                        if rating:
+                            break
+                except NoSuchElementException:
+                    continue
             
             # Extract image
-            image_selector = self.selectors.get('image', '.s-image')
-            try:
-                image_element = container.find_element(By.CSS_SELECTOR, image_selector)
-                image_url = image_element.get_attribute('src') if image_element else None
-            except NoSuchElementException:
-                image_url = None
+            image_selectors = ['.s-image', 'img', '[data-src]']
+            image_url = None
+            for selector in image_selectors:
+                try:
+                    image_element = container.find_element(By.CSS_SELECTOR, selector)
+                    image_url = image_element.get_attribute('src') or image_element.get_attribute('data-src')
+                    if image_url and 'http' in image_url:
+                        break
+                except NoSuchElementException:
+                    continue
             
-            # Extract ASIN from URL
+            # Extract ASIN from URL or data attributes
             asin = None
             if url:
                 import re
@@ -654,8 +745,11 @@ class AdvancedSeleniumScraper(BaseScraper):
                 if asin_match:
                     asin = asin_match.group(1)
             
+            if not asin:
+                asin = container.get_attribute('data-asin')
+            
             product = {
-                'source': self.source,
+                'source': 'amazon',
                 'title': title,
                 'url': url,
                 'product_id': asin,
@@ -665,7 +759,8 @@ class AdvancedSeleniumScraper(BaseScraper):
                 'search_keyword': keyword,
                 'page_number': page,
                 'position_on_page': position,
-                'scraper_type': 'selenium'
+                'scraper_type': 'selenium',
+                'scraped_at': datetime.now().isoformat()
             }
             
             return self._clean_product_data(product)
@@ -675,42 +770,206 @@ class AdvancedSeleniumScraper(BaseScraper):
             return None
     
     def _extract_ebay_products_selenium(self, keyword: str, page: int) -> List[Dict[str, Any]]:
-        """Extract eBay products using Selenium."""
-        # Similar implementation to Amazon but with eBay-specific selectors
+        """Extract eBay products using Selenium with robust selectors."""
         products = []
         
         try:
-            container_selector = self.selectors.get('product_container', '.s-item')
-            self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, container_selector)))
+            # Multiple possible selectors for eBay product containers
+            container_selectors = [
+                '.s-item',
+                '.srp-item',
+                '.srp-river-results .s-item',
+                '[data-view="mi:1686"]'
+            ]
             
-            containers = self.driver.find_elements(By.CSS_SELECTOR, container_selector)
-            self.logger.info(f"Found {len(containers)} eBay product containers")
-            
-            for i, container in enumerate(containers, 1):
+            containers = []
+            for selector in container_selectors:
                 try:
-                    # Extract basic product info (simplified for brevity)
-                    title_element = container.find_element(By.CSS_SELECTOR, '.s-item__title')
-                    title = clean_text(title_element.text) if title_element else None
-                    
-                    if title and 'shop on ebay' not in title.lower():
-                        product = {
-                            'source': self.source,
-                            'title': title,
-                            'search_keyword': keyword,
-                            'page_number': page,
-                            'position_on_page': i,
-                            'scraper_type': 'selenium'
-                        }
-                        products.append(product)
-                        
+                    self.wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, selector)))
+                    containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if containers:
+                        self.logger.info(f"Found {len(containers)} eBay products using selector: {selector}")
+                        break
+                except TimeoutException:
+                    continue
+            
+            if not containers:
+                self.logger.warning("No eBay product containers found. Checking page content...")
+                page_text = self.driver.page_source[:1000]
+                self.logger.debug(f"eBay page content preview: {page_text}")
+                
+                # Broad fallback selectors
+                broad_selectors = [
+                    '[id*="item"]',
+                    '.item',
+                    '.listing',
+                    '.product'
+                ]
+                
+                for selector in broad_selectors:
+                    containers = self.driver.find_elements(By.CSS_SELECTOR, selector)
+                    if containers:
+                        self.logger.info(f"Found {len(containers)} eBay elements with broad selector: {selector}")
+                        break
+            
+            # Extract data from containers
+            for i, container in enumerate(containers[:20], 1):  # Limit to 20 products
+                try:
+                    product = self._extract_ebay_product_robust(container, keyword, page, i)
+                    if product and product.get('title'):
+                        # Skip promotional/sponsored items
+                        title = product.get('title', '').lower()
+                        if not any(skip_word in title for skip_word in ['shop on ebay', 'sponsored', 'advertisement']):
+                            products.append(product)
+                            self.logger.debug(f"Extracted eBay product {i}: {product.get('title', 'No title')[:50]}...")
                 except Exception as e:
                     self.logger.debug(f"Failed to extract eBay product {i}: {e}")
                     continue
+            
+            self.logger.info(f"Successfully extracted {len(products)} eBay products")
             
         except Exception as e:
             self.logger.error(f"Error extracting eBay products: {e}")
         
         return products
+    
+    def _extract_ebay_product_robust(self, container, keyword: str, page: int, position: int) -> Optional[Dict[str, Any]]:
+        """Extract single eBay product with multiple fallback selectors."""
+        try:
+            # Multiple title selectors for eBay
+            title_selectors = [
+                '.s-item__title',
+                '.s-item__title span',
+                '.it-ttl a',
+                '.vip-title',
+                'h3.it-ttl',
+                '[role="heading"]'
+            ]
+            
+            title = None
+            for selector in title_selectors:
+                try:
+                    title_element = container.find_element(By.CSS_SELECTOR, selector)
+                    title = clean_text(title_element.text) if title_element else None
+                    if title and len(title) > 10:
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # Fallback to container text
+            if not title:
+                all_text = container.text.strip()
+                if all_text:
+                    lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+                    for line in lines:
+                        if len(line) > 15 and not line.startswith('$') and 'bid' not in line.lower():
+                            title = line
+                            break
+            
+            if not title or title.lower() == 'shop on ebay':
+                return None
+            
+            # Extract URL with multiple selectors
+            url_selectors = ['.s-item__link', '.it-ttl a', 'a[href*="/itm/"]', 'a']
+            url = None
+            for selector in url_selectors:
+                try:
+                    link_element = container.find_element(By.CSS_SELECTOR, selector)
+                    relative_url = link_element.get_attribute('href')
+                    if relative_url and ('/itm/' in relative_url or 'ebay.com' in relative_url):
+                        url = normalize_url(relative_url, 'https://www.ebay.com')
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # Extract price with multiple selectors
+            price_selectors = [
+                '.s-item__price',
+                '.notranslate',
+                '.it-price',
+                '.u-flL.notranslate',
+                '.s-item__detail.s-item__detail--primary .notranslate'
+            ]
+            
+            price = None
+            for selector in price_selectors:
+                try:
+                    price_element = container.find_element(By.CSS_SELECTOR, selector)
+                    price_text = price_element.text
+                    if price_text and '$' in price_text:
+                        price = extract_price(price_text)
+                        if price:
+                            break
+                except NoSuchElementException:
+                    continue
+            
+            # Extract shipping
+            shipping_selectors = ['.s-item__shipping', '.vi-acc-del-range', '.u-flL']
+            shipping = None
+            for selector in shipping_selectors:
+                try:
+                    shipping_element = container.find_element(By.CSS_SELECTOR, selector)
+                    shipping_text = shipping_element.text
+                    if shipping_text and ('shipping' in shipping_text.lower() or 'free' in shipping_text.lower()):
+                        shipping = shipping_text.strip()
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # Extract condition
+            condition_selectors = ['.s-item__subtitle', '.clipped', '.SECONDARY_INFO']
+            condition = None
+            for selector in condition_selectors:
+                try:
+                    condition_element = container.find_element(By.CSS_SELECTOR, selector)
+                    condition_text = condition_element.text
+                    if condition_text and any(word in condition_text.lower() for word in ['new', 'used', 'refurbished', 'open']):
+                        condition = condition_text.strip()
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # Extract image
+            image_selectors = ['.s-item__image img', '.img img', 'img']
+            image_url = None
+            for selector in image_selectors:
+                try:
+                    image_element = container.find_element(By.CSS_SELECTOR, selector)
+                    image_url = image_element.get_attribute('src') or image_element.get_attribute('data-src')
+                    if image_url and 'http' in image_url and 'ebayimg' in image_url:
+                        break
+                except NoSuchElementException:
+                    continue
+            
+            # Extract item ID from URL
+            item_id = None
+            if url:
+                import re
+                id_match = re.search(r'/itm/([^/?]+)', url)
+                if id_match:
+                    item_id = id_match.group(1)
+            
+            product = {
+                'source': 'ebay',
+                'title': title,
+                'url': url,
+                'product_id': item_id,
+                'price': price,
+                'shipping': shipping,
+                'condition': condition,
+                'image_url': image_url,
+                'search_keyword': keyword,
+                'page_number': page,
+                'position_on_page': position,
+                'scraper_type': 'selenium',
+                'scraped_at': datetime.now().isoformat()
+            }
+            
+            return self._clean_product_data(product)
+            
+        except Exception as e:
+            self.logger.debug(f"Failed to extract eBay product: {e}")
+            return None
     
     def _extract_walmart_products_selenium(self, keyword: str, page: int) -> List[Dict[str, Any]]:
         """Extract Walmart products using Selenium."""

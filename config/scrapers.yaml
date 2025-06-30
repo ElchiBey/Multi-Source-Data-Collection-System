@@ -1,6 +1,9 @@
 # Scraper-specific Configuration
 
 amazon:
+  base_url: 'https://www.amazon.com'
+  search_path: '/s?k={keyword}&page={page}'
+  
   selectors:
     # Product listing selectors
     product_container: '[data-component-type="s-search-result"]'
@@ -32,6 +35,9 @@ amazon:
     product: '/dp/{asin}'
 
 ebay:
+  base_url: 'https://www.ebay.com'
+  search_path: '/sch/i.html?_nkw={keyword}&_pgn={page}'
+  
   selectors:
     # Listing selectors
     product_container: '.s-item'
@@ -59,6 +65,9 @@ ebay:
     item: '/itm/{item_id}'
 
 walmart:
+  base_url: 'https://www.walmart.com'
+  search_path: '/search/?query={keyword}&page={page}'
+  
   selectors:
     # Product grid selectors
     product_container: '[data-automation-id="product-tile"]'
