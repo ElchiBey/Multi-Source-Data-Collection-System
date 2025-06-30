@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 import click
 import logging
 from pathlib import Path
+import time
 
 from src.utils.logger import setup_logger
 from src.utils.config import load_config
@@ -299,6 +300,55 @@ def test():
             
     except FileNotFoundError:
         raise click.ClickException("pytest not found. Install with: pip install pytest")
+
+@main.command()
+@click.option('--target', default=5000, help='Target number of records to collect')
+@click.option('--workers', default=8, help='Number of parallel workers')
+@click.option('--batch-size', default=12, help='Batch size for parallel processing')
+@click.pass_context
+def turbo(ctx, target, workers, batch_size):
+    """🚀 TURBO MODE: High-speed optimized data collection (5-10x faster)."""
+    from src.utils.optimized_collection import OptimizedCollectionStrategy
+    
+    logger.info(f"🚀 TURBO MODE: Collecting {target:,} records with {workers} workers")
+    
+    try:
+        # Update config with performance settings
+        ctx.obj['config']['collection'] = {
+            'max_workers': workers,
+            'batch_size': batch_size
+        }
+        
+        # Initialize optimized collector
+        collector = OptimizedCollectionStrategy(ctx.obj['config'])
+        
+        # Execute optimized collection
+        click.echo(f"⚡ Starting TURBO collection with {workers} parallel workers...")
+        click.echo(f"📦 Using batch size of {batch_size} tasks per batch")
+        
+        start_time = time.time()
+        results = collector.execute_optimized_collection(target)
+        
+        # Display results
+        if 'error' not in results:
+            click.echo(f"\n🎉 TURBO COLLECTION COMPLETED!")
+            click.echo(f"📊 Final count: {results['total_records']:,} records")
+            click.echo(f"⏱️  Total time: {results['total_time']:.1f} seconds")
+            click.echo(f"🚀 Performance: {results['records_per_second']:.1f} records/second")
+            click.echo(f"📈 Success rate: {results['success_rate']:.1f}%")
+            click.echo(f"📦 Batches processed: {results['batches_processed']}")
+            
+            if results['target_achieved']:
+                click.echo(f"🎯 TARGET ACHIEVED! {results['total_records']:,} >= {target:,}")
+            else:
+                click.echo(f"📈 Progress: {(results['total_records']/target)*100:.1f}% of target")
+                
+        else:
+            click.echo(f"❌ Collection failed: {results['error']}")
+            
+    except Exception as e:
+        logger.error(f"Turbo collection failed: {e}")
+        raise click.ClickException(f"Turbo error: {e}")
 
 if __name__ == '__main__':
     main() 
